@@ -8,6 +8,12 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 
+/* Project 1 */
+
+extern struct list sleep_list;
+
+/* Project 1 */
+
 /* See [8254] for hardware details of the 8254 timer chip. */
 
 #if TIMER_FREQ < 19

@@ -18,12 +18,6 @@ enum thread_status {
 	THREAD_DYING        /* About to be destroyed. */
 };
 
-/* Project 1 */
-
-struct list sleep_list;
-
-/* xProject 1 */
-
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;

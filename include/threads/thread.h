@@ -18,6 +18,12 @@ enum thread_status {
 	THREAD_DYING        /* About to be destroyed. */
 };
 
+/* Project 1 */
+
+struct list sleep_list;
+
+/* xProject 1 */
+
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
@@ -94,6 +100,12 @@ struct thread {
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+
+	/* Project 1 */
+
+	int64_t tick_to_wakeup;			 	/* Tick to wakeup. */
+
+	/* Project 1 */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

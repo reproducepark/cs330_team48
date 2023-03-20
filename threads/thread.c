@@ -28,6 +28,12 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+/* Project 1 */
+
+struct list sleep_list;	/* List for sleeping threads. */
+
+/* Project 1 */
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -108,6 +114,13 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+
+	/* Project 1*/
+
+	list_init (&sleep_list);
+
+	/* Project 1*/
+
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */

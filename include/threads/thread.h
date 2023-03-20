@@ -149,4 +149,11 @@ int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
 
+/* Project 1 */
+
+bool priority_less_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool check_to_yield (void);
+
+/* Project 1 */
+
 #endif /* threads/thread.h */

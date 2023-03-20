@@ -113,6 +113,7 @@ sema_up (struct semaphore *sema) {
 	old_level = intr_disable ();
 	/* Project 1 */
 	if (!list_empty (&sema->waiters)){
+		list_sort (&sema->waiters, priority_less_func, NULL);
 		thread_unblock (list_entry (list_pop_front (&sema->waiters),
 					struct thread, elem));
 	}
@@ -196,8 +197,28 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
+	/* Project 1 */
+
+	struct thread * t_cur = thread_current();
+	t_cur->lock_waiting = lock;
+	if(lock->holder != NULL) {
+		list_push_back(&lock->holder->donate_list, &t_cur->donate_elem);
+		int cnt = 0;
+		struct thread * t2;
+		for(struct thread * t1 = t_cur; t1->lock_waiting != NULL && (cnt < 8); t1 = t2){
+			t2 = t1->lock_waiting->holder;
+			if(t2->priority < t1->priority) {
+				t2->priority = t1->priority;
+			}
+			cnt++;
+		}
+	}
+
 	sema_down (&lock->semaphore);
 	lock->holder = thread_current ();
+	t_cur->lock_waiting = NULL;
+
+	/* Project 1 */
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -231,6 +252,27 @@ lock_release (struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	lock->holder = NULL;
+
+	/* Project 1 */
+
+	struct thread * t = thread_current();
+	for(struct list_elem * e = list_begin(&t->donate_list); e != list_end(&t->donate_list);){
+		if(list_entry(e, struct thread, donate_elem)->lock_waiting == lock){
+			e = list_remove(e);
+			continue;
+		}
+		e = list_next(e);
+	}
+
+	t->priority = t->original_priority;
+	for(struct list_elem * e = list_begin(&t->donate_list); e != list_end(&t->donate_list); e = list_next(e)){
+		int donate_priority = list_entry(e, struct thread, donate_elem)->priority;
+		if(donate_priority > t->priority){
+			t->priority = donate_priority;
+		}
+	}
+
+	/* Project 1 */
 	sema_up (&lock->semaphore);
 }
 
@@ -291,7 +333,7 @@ cond_wait (struct condition *cond, struct lock *lock) {
 
 	sema_init (&waiter.semaphore, 0);
 	/* Project 1*/
-	list_push_back (&cond->waiters, &waiter.elem);
+	list_push_back(&cond->waiters, &waiter.elem);
 	/* Project 1*/
 	lock_release (lock);
 	sema_down (&waiter.semaphore);

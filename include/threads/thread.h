@@ -8,6 +8,9 @@
 #ifdef VM
 #include "vm/vm.h"
 #endif
+/* Project 1 */
+#include "threads/synch.h"
+/* Project 1 */
 
 
 /* States in a thread's life cycle. */
@@ -98,6 +101,11 @@ struct thread {
 	/* Project 1 */
 
 	int64_t tick_to_wakeup;			 	/* Tick to wakeup. */
+
+	int original_priority;				/* Original priority */
+	struct lock * lock_waiting;			/* lock which thread is wating for */
+	struct list donate_list;			/* List of threads that can donate priority to this thread */
+	struct list_elem donate_elem;		/* Element for donate_list */
 
 	/* Project 1 */
 

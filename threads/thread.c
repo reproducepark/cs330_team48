@@ -336,11 +336,23 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
 	/* Project 1 */
+	thread_current ()->original_priority = new_priority;
+	thread_current ()->priority = new_priority;
+
+	struct thread * t = thread_current();
+	
+	for(struct list_elem * e = list_begin(&t->donate_list); e != list_end(&t->donate_list); e = list_next(e)){
+		int donate_priority = list_entry(e, struct thread, donate_elem)->priority;
+		if(donate_priority > t->priority){
+			t->priority = donate_priority;
+		}
+	}
+
 	if(check_to_yield()){
 		thread_yield();
 	}
+
 	/* Project 1 */
 }
 
@@ -438,6 +450,11 @@ init_thread (struct thread *t, const char *name, int priority) {
 	strlcpy (t->name, name, sizeof t->name);
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
+	/* Project 1 */
+	t->original_priority = priority;
+	t->lock_waiting = NULL;
+	list_init(&t->donate_list);
+	/* Project 1 */
 	t->magic = THREAD_MAGIC;
 }
 

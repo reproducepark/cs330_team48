@@ -11,6 +11,7 @@
 /* Project 1 */
 
 extern struct list sleep_list;
+extern int load_avg;
 
 /* Project 1 */
 
@@ -143,6 +144,17 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	thread_tick ();
 
 	/* Project 1 */
+	
+	if(thread_mlfqs == true){
+		increase_recent_cpu();
+		if(ticks % 4 == 0){
+			recalculate_priority();
+			if(ticks % TIMER_FREQ == 0){
+				recalculate_load_avg();
+				recalculate_recent_cpu();
+			}
+		}
+	}
 
 	for(struct list_elem *e = list_begin(&sleep_list); e!= list_end(&sleep_list);) {
 		struct thread *t = list_entry(e, struct thread, elem);

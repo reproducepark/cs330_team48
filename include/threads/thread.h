@@ -107,6 +107,9 @@ struct thread {
 	struct list donate_list;			/* List of threads that can donate priority to this thread */
 	struct list_elem donate_elem;		/* Element for donate_list */
 
+	int niceness;
+	int recent_cpu;
+
 	/* Project 1 */
 
 #ifdef USERPROG
@@ -161,6 +164,13 @@ void do_iret (struct intr_frame *tf);
 
 bool priority_less_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 bool check_to_yield (void);
+void recalculate_load_avg (void);
+void recalculate_recent_cpu (void);
+void calculate_recent_cpu (struct thread *t);
+void traverse_list (struct list *l, void (*func)(struct thread *));
+void calculate_priority (struct thread *t);
+void recalculate_priority (void);
+void increase_recent_cpu (void);
 
 /* Project 1 */
 

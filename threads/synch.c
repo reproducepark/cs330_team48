@@ -32,6 +32,10 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+/* Project 1 */
+extern struct list sema_list;
+/* Project 1 */
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -47,6 +51,11 @@ sema_init (struct semaphore *sema, unsigned value) {
 
 	sema->value = value;
 	list_init (&sema->waiters);
+	/* Project 1 */
+	if(thread_mlfqs == true){
+		list_push_back (&sema_list, &sema->sema_elem);
+	}
+	/* Project 1 */
 }
 
 /* Down or "P" operation on a semaphore.  Waits for SEMA's value
@@ -67,7 +76,7 @@ sema_down (struct semaphore *sema) {
 	old_level = intr_disable ();
 	while (sema->value == 0) {
 		/* Project 1 */
-		list_insert_ordered (&sema->waiters, &thread_current ()->elem, priority_less_func, NULL);
+		list_push_back (&sema->waiters, &thread_current ()->elem);
 		/* Project 1 */
 		thread_block ();
 	}
@@ -198,19 +207,20 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!lock_held_by_current_thread (lock));
 
 	/* Project 1 */
-
 	struct thread * t_cur = thread_current();
-	t_cur->lock_waiting = lock;
-	if(lock->holder != NULL) {
-		list_push_back(&lock->holder->donate_list, &t_cur->donate_elem);
-		int cnt = 0;
-		struct thread * t2;
-		for(struct thread * t1 = t_cur; t1->lock_waiting != NULL && (cnt < 8); t1 = t2){
-			t2 = t1->lock_waiting->holder;
-			if(t2->priority < t1->priority) {
-				t2->priority = t1->priority;
+	if(!thread_mlfqs){
+		t_cur->lock_waiting = lock;
+		if(lock->holder != NULL) {
+			list_push_back(&lock->holder->donate_list, &t_cur->donate_elem);
+			int cnt = 0;
+			struct thread * t2;
+			for(struct thread * t1 = t_cur; t1->lock_waiting != NULL && (cnt < 8); t1 = t2){
+				t2 = t1->lock_waiting->holder;
+				if(t2->priority < t1->priority) {
+					t2->priority = t1->priority;
+				}
+				cnt++;
 			}
-			cnt++;
 		}
 	}
 
@@ -255,20 +265,22 @@ lock_release (struct lock *lock) {
 
 	/* Project 1 */
 
-	struct thread * t = thread_current();
-	for(struct list_elem * e = list_begin(&t->donate_list); e != list_end(&t->donate_list);){
-		if(list_entry(e, struct thread, donate_elem)->lock_waiting == lock){
-			e = list_remove(e);
-			continue;
+	if(!thread_mlfqs){
+		struct thread * t = thread_current();
+		for(struct list_elem * e = list_begin(&t->donate_list); e != list_end(&t->donate_list);){
+			if(list_entry(e, struct thread, donate_elem)->lock_waiting == lock){
+				e = list_remove(e);
+				continue;
+			}
+			e = list_next(e);
 		}
-		e = list_next(e);
-	}
 
-	t->priority = t->original_priority;
-	for(struct list_elem * e = list_begin(&t->donate_list); e != list_end(&t->donate_list); e = list_next(e)){
-		int donate_priority = list_entry(e, struct thread, donate_elem)->priority;
-		if(donate_priority > t->priority){
-			t->priority = donate_priority;
+		t->priority = t->original_priority;
+		for(struct list_elem * e = list_begin(&t->donate_list); e != list_end(&t->donate_list); e = list_next(e)){
+			int donate_priority = list_entry(e, struct thread, donate_elem)->priority;
+			if(donate_priority > t->priority){
+				t->priority = donate_priority;
+			}
 		}
 	}
 

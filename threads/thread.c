@@ -15,6 +15,10 @@
 #include "userprog/process.h"
 #endif
 
+/* Project 1 */
+#include "threads/fixed-point.h"
+/* Project 1 */
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -31,6 +35,8 @@ static struct list ready_list;
 /* Project 1 */
 
 struct list sleep_list;	/* List for sleeping threads. */
+int load_avg;
+struct list sema_list;  /* List for semaphores. */
 
 /* Project 1 */
 
@@ -111,15 +117,18 @@ thread_init (void) {
 	};
 	lgdt (&gdt_ds);
 
+	/* Project 1*/
+	list_init (&sleep_list);
+	load_avg = 0;
+	if(thread_mlfqs == true){
+		list_init (&sema_list);
+	}
+	/* Project 1*/
+
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 
-	/* Project 1*/
-
-	list_init (&sleep_list);
-
-	/* Project 1*/
 
 	list_init (&destruction_req);
 
@@ -364,29 +373,34 @@ thread_get_priority (void) {
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) {
-	/* TODO: Your implementation goes here */
+thread_set_nice (int nice) {
+	/* Project 1 */
+	thread_current()->niceness = nice;
+	/* Project 1 */
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) {
-	/* TODO: Your implementation goes here */
-	return 0;
+	/* Project 1 */
+	return thread_current()->niceness;
+	/* Project 1 */
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) {
-	/* TODO: Your implementation goes here */
-	return 0;
+	/* Project 1 */
+	return fptoird(fpmultn(load_avg, 100));
+	/* Project 1 */
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) {
-	/* TODO: Your implementation goes here */
-	return 0;
+	/* Project 1 */
+	return fptoird(fpmultn(thread_current()->recent_cpu, 100));
+	/* Project 1 */
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -454,6 +468,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->original_priority = priority;
 	t->lock_waiting = NULL;
 	list_init(&t->donate_list);
+	t->niceness = 0;
+	t->recent_cpu = 0;
 	/* Project 1 */
 	t->magic = THREAD_MAGIC;
 }
@@ -653,6 +669,65 @@ bool check_to_yield (void) {
 	struct thread *t = list_entry (first_elem, struct thread, elem);
 
 	return t->priority > thread_current ()->priority;
+}
+
+void recalculate_load_avg (void){
+	int ready_threads = list_size(&ready_list);
+	if(thread_current() != idle_thread){
+		ready_threads++;
+	}
+	load_avg = fpadd(fpmult(fpdiv(itofp(59), itofp(60)), load_avg), fpmultn(fpdiv(itofp(1), itofp(60)), ready_threads));
+}
+
+void recalculate_recent_cpu (void){
+	traverse_list(&ready_list, calculate_recent_cpu);
+	traverse_list(&sleep_list, calculate_recent_cpu);
+	// for(struct list_elem *e = list_begin(&sema_list); e != list_end(&sema_list); e = list_next(e)){
+	// 	struct semaphore *sema = list_entry(e, struct semaphore, sema_elem);
+	// 	traverse_list(&sema->waiters, calculate_recent_cpu);
+	// }
+}
+
+void calculate_recent_cpu (struct thread *t){
+	t->recent_cpu = fpaddn(fpmult(fpdiv(fpmultn(load_avg, 2), fpaddn(fpmultn(load_avg, 2), 1)), t->recent_cpu), t->niceness);
+}
+
+void traverse_list (struct list *l, void (*func)(struct thread *)){
+	for(struct list_elem *e = list_begin(l); e != list_end(l); e = list_next(e)){
+		struct thread *t = list_entry(e, struct thread, elem);
+		func(t);
+	}
+}
+
+void recalculate_priority (void){
+	// traverse_list(&ready_list, calculate_priority);
+	// traverse_list(&sleep_list, calculate_priority);
+	for(struct list_elem *e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e)){
+		struct thread *t = list_entry(e, struct thread, elem);
+		t->priority = fptoi(fpaddn(fpdivn(t->recent_cpu, -4), PRI_MAX - t->niceness * 2));
+	}
+	for(struct list_elem *e = list_begin(&sleep_list); e != list_end(&sleep_list); e = list_next(e)){
+		struct thread *t = list_entry(e, struct thread, elem);
+		t->priority = fptoi(fpaddn(fpdivn(t->recent_cpu, -4), PRI_MAX - t->niceness * 2));
+	}
+	// for(struct list_elem *e = list_begin(&sema_list); e != list_end(&sema_list); e = list_next(e)){
+	// 	struct semaphore *sema = list_entry(e, struct semaphore, sema_elem);
+	// 	// traverse_list(&sema->waiters, calculate_priority);
+	// 	for(struct list_elem *e = list_begin(&sema->waiters); e != list_end(&sema->waiters); e = list_next(e)){
+	// 		struct thread *t = list_entry(e, struct thread, elem);
+	// 		t->priority = fptoi(fpaddn(fpdivn(t->recent_cpu, -4), PRI_MAX - t->niceness * 2));
+	// 	}
+	// }
+}
+
+void calculate_priority (struct thread *t){
+	t->priority = fptoi(fpaddn(fpdivn(t->recent_cpu, -4), PRI_MAX - t->niceness * 2));
+}
+
+void increase_recent_cpu (void){
+	if(thread_current() != idle_thread){
+		thread_current()->recent_cpu = fpaddn(thread_current()->recent_cpu, 1);
+	}
 }
 
 /* Project 1 */

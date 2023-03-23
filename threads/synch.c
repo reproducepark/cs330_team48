@@ -32,10 +32,6 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
-/* Project 1 */
-extern struct list sema_list;
-/* Project 1 */
-
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -51,11 +47,6 @@ sema_init (struct semaphore *sema, unsigned value) {
 
 	sema->value = value;
 	list_init (&sema->waiters);
-	/* Project 1 */
-	if(thread_mlfqs == true){
-		list_push_back (&sema_list, &sema->sema_elem);
-	}
-	/* Project 1 */
 }
 
 /* Down or "P" operation on a semaphore.  Waits for SEMA's value

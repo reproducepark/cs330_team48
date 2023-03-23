@@ -36,7 +36,6 @@ static struct list ready_list;
 
 struct list sleep_list;	/* List for sleeping threads. */
 int load_avg;
-struct list sema_list;  /* List for semaphores. */
 
 /* Project 1 */
 
@@ -119,16 +118,11 @@ thread_init (void) {
 
 	/* Project 1*/
 	list_init (&sleep_list);
-	load_avg = 0;
-	if(thread_mlfqs == true){
-		list_init (&sema_list);
-	}
 	/* Project 1*/
 
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
-
 
 	list_init (&destruction_req);
 
@@ -147,7 +141,9 @@ thread_start (void) {
 	struct semaphore idle_started;
 	sema_init (&idle_started, 0);
 	thread_create ("idle", PRI_MIN, idle, &idle_started);
-
+	/* Project 1 */
+	load_avg = 0;
+	/* Project 1 */
 	/* Start preemptive thread scheduling. */
 	intr_enable ();
 
@@ -680,12 +676,9 @@ void recalculate_load_avg (void){
 }
 
 void recalculate_recent_cpu (void){
+	calculate_recent_cpu(thread_current());
 	traverse_list(&ready_list, calculate_recent_cpu);
 	traverse_list(&sleep_list, calculate_recent_cpu);
-	// for(struct list_elem *e = list_begin(&sema_list); e != list_end(&sema_list); e = list_next(e)){
-	// 	struct semaphore *sema = list_entry(e, struct semaphore, sema_elem);
-	// 	traverse_list(&sema->waiters, calculate_recent_cpu);
-	// }
 }
 
 void calculate_recent_cpu (struct thread *t){
@@ -700,24 +693,9 @@ void traverse_list (struct list *l, void (*func)(struct thread *)){
 }
 
 void recalculate_priority (void){
-	// traverse_list(&ready_list, calculate_priority);
-	// traverse_list(&sleep_list, calculate_priority);
-	for(struct list_elem *e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e)){
-		struct thread *t = list_entry(e, struct thread, elem);
-		t->priority = fptoi(fpaddn(fpdivn(t->recent_cpu, -4), PRI_MAX - t->niceness * 2));
-	}
-	for(struct list_elem *e = list_begin(&sleep_list); e != list_end(&sleep_list); e = list_next(e)){
-		struct thread *t = list_entry(e, struct thread, elem);
-		t->priority = fptoi(fpaddn(fpdivn(t->recent_cpu, -4), PRI_MAX - t->niceness * 2));
-	}
-	// for(struct list_elem *e = list_begin(&sema_list); e != list_end(&sema_list); e = list_next(e)){
-	// 	struct semaphore *sema = list_entry(e, struct semaphore, sema_elem);
-	// 	// traverse_list(&sema->waiters, calculate_priority);
-	// 	for(struct list_elem *e = list_begin(&sema->waiters); e != list_end(&sema->waiters); e = list_next(e)){
-	// 		struct thread *t = list_entry(e, struct thread, elem);
-	// 		t->priority = fptoi(fpaddn(fpdivn(t->recent_cpu, -4), PRI_MAX - t->niceness * 2));
-	// 	}
-	// }
+	calculate_priority(thread_current());
+	traverse_list(&ready_list, calculate_priority);
+	traverse_list(&sleep_list, calculate_priority);
 }
 
 void calculate_priority (struct thread *t){

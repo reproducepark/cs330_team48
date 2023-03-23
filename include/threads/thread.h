@@ -106,7 +106,7 @@ struct thread {
 	struct lock * lock_waiting;			/* lock which thread is wating for */
 	struct list donate_list;			/* List of threads that can donate priority to this thread */
 	struct list_elem donate_elem;		/* Element for donate_list */
-
+	
 	int niceness;
 	int recent_cpu;
 

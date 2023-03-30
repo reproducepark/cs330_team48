@@ -184,7 +184,10 @@ process_exec (void *f_name) {
 	if (!success)
 		return -1;
 
-	hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
+	/* Project 2 */
+	// For debugging
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
+	/* Project 2 */
 
 	/* Start switched process. */
 	do_iret (&_if);
@@ -334,8 +337,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Project 2 */
 
 	char *save_ptr;
-	char * fn_cpy;
-	// char fn_cpy[128];
+	char *fn_cpy;
 	char *token;
 	char *argv[128];
 	int argc = 0;

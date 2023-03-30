@@ -41,6 +41,60 @@ syscall_init (void) {
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
-	printf ("system call!\n");
+	/* Project 2 */
+	switch(f->R.rax){
+		case SYS_HALT:
+			halt();
+			break;
+		case SYS_EXIT:
+			exit();
+			break;
+		case SYS_FORK:
+			fork();
+			break;
+		case SYS_EXEC:
+			exec();
+			break;
+		case SYS_WAIT:	
+			wait();
+			break;
+		case SYS_CREATE:
+			create();
+			break;
+		case SYS_REMOVE:
+			remove();
+			break;
+		case SYS_OPEN:
+			open();
+			break;
+		case SYS_FILESIZE:
+			filesize();
+			break;
+		case SYS_READ:
+			read();
+			break;
+		case SYS_WRITE:
+			write();
+			break;
+		case SYS_SEEK:
+			seek();
+			break;
+		case SYS_TELL:
+			tell();
+			break;
+		case SYS_CLOSE:
+			close();
+			break;
+		case default:
+			break;
+	}
+	/* Project 2 */
 	thread_exit ();
 }
+
+void halt(void) {
+	power_off();
+}
+
+/* Project 2 */
+

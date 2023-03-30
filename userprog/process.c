@@ -184,6 +184,8 @@ process_exec (void *f_name) {
 	if (!success)
 		return -1;
 
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
+
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -204,6 +206,7 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	while(1){}
 	return -1;
 }
 
@@ -328,6 +331,29 @@ load (const char *file_name, struct intr_frame *if_) {
 	off_t file_ofs;
 	bool success = false;
 	int i;
+	/* Project 2 */
+
+	char *save_ptr;
+	char * fn_cpy;
+	// char fn_cpy[128];
+	char *token;
+	char *argv[128];
+	int argc = 0;
+	int fn_len = strlen (file_name);
+
+	fn_cpy = (char *)malloc (fn_len+1);
+	strlcpy (fn_cpy, file_name, fn_len+1);
+
+	file_name = strtok_r (fn_cpy, " ", &save_ptr);
+	argv[argc] = file_name;
+	argc++;
+
+	while((token = strtok_r (NULL, " ", &save_ptr)) != NULL){
+		argv[argc] = token;
+		argc++;
+	}
+
+	/* Project 2 */
 
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
@@ -414,13 +440,49 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
+	/* Project 2 */
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+
+	// for argv strings
+	for(int i = argc - 1; i >= 0; i--){
+		int len = strlen(argv[i]);
+		if_->rsp -= (len+1);
+		strlcpy((char *)if_->rsp, argv[i], len + 1);
+		argv[i] = if_->rsp;
+	}
+	
+	// for padding
+	while(if_->rsp % 8 != 0){
+		if_->rsp --;
+		memset(if_->rsp, 0, sizeof(uint8_t));
+	}
+
+	// for argv
+	if_->rsp -= sizeof(char *);
+	memset(if_->rsp, 0, sizeof(char*));
+	
+	for(int i = argc - 1; i >= 0; i--){
+		if_->rsp -= sizeof(char *);
+		*(char **)(if_->rsp) = argv[i];
+	}
+
+	// for return address
+	if_->rsp -= sizeof(void *);
+	memset(if_->rsp, 0, sizeof(void*));
+	
+	if_->R.rdi = argc;
+	if_->R.rsi = if_->rsp + sizeof(char *);
+
+	/* Project 2 */
 
 	success = true;
 
 done:
 	/* We arrive here whether the load is successful or not. */
+	/* Project 2 */
+	free (fn_cpy);
+	/* Project 2 */
 	file_close (file);
 	return success;
 }

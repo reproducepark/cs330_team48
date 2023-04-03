@@ -8,6 +8,13 @@
 #include "threads/flags.h"
 #include "intrinsic.h"
 
+/* Project 2 */
+#include "filesys/filesys.h"
+#include "filesys/file.h"
+#include "userprog/process.h"
+struct lock sys_lock;
+/* Project 2 */
+
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 
@@ -35,6 +42,10 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+	
+	/* Project 2 */
+	lock_init(&sys_lock);
+	/* Project 2 */
 }
 
 /* The main system call interface */
@@ -47,54 +58,219 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			halt();
 			break;
 		case SYS_EXIT:
-			exit();
+			exit(f->R.rdi);
 			break;
 		case SYS_FORK:
-			fork();
+			f->R.rax = fork(f->R.rdi, f);
 			break;
 		case SYS_EXEC:
-			exec();
+			f->R.rax = exec(f->R.rdi);
 			break;
 		case SYS_WAIT:	
-			wait();
+			f->R.rax = wait(f->R.rdi);
 			break;
 		case SYS_CREATE:
-			create();
+			f->R.rax = create(f->R.rdi, f->R.rsi);
 			break;
 		case SYS_REMOVE:
-			remove();
+			f->R.rax = remove(f->R.rdi);
 			break;
 		case SYS_OPEN:
-			open();
+			f->R.rax = open(f->R.rdi);
 			break;
 		case SYS_FILESIZE:
-			filesize();
+			f->R.rax = filesize(f->R.rdi);
 			break;
 		case SYS_READ:
-			read();
+			f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
 			break;
 		case SYS_WRITE:
-			write();
+			f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
 			break;
 		case SYS_SEEK:
-			seek();
+			seek(f->R.rdi, f->R.rsi);
 			break;
 		case SYS_TELL:
-			tell();
+			f->R.rax = tell(f->R.rdi);
 			break;
 		case SYS_CLOSE:
-			close();
+			close(f->R.rdi);
 			break;
-		case default:
+		default:
+			// exit(-1);
 			break;
 	}
 	/* Project 2 */
-	thread_exit ();
 }
+/* Project 2 */
 
-void halt(void) {
+void halt (void) {
 	power_off();
 }
+
+void exit (int status) {
+	printf ("%s: exit(%d)\n", thread_current()->name, status);
+	thread_exit();
+}
+
+pid_t fork (const char *thread_name, struct intr_frame *if_ ) {
+	if(check_addr(thread_name) == false){
+		return -1;
+	}
+	return process_fork(thread_name, if_);
+}
+
+int exec (const char *cmd_line) {
+	if(check_addr(cmd_line) == false){
+		return -1;
+	}
+	char *fn_copy = palloc_get_page (0);
+	if (fn_copy == NULL){
+		return TID_ERROR;
+	}
+	strlcpy (fn_copy, cmd_line, PGSIZE);
+
+	return process_exec(fn_copy);
+}
+
+int wait (pid_t pid) {
+	
+	return process_wait(pid);
+}
+
+bool create (const char *file, unsigned initial_size){
+	//we need to check the address
+	if(check_addr(file) == false){
+		return false;
+	}
+	return filesys_create(file, initial_size);
+}
+
+bool remove (const char *file) {
+	//we need to check the address
+	if(check_addr(file) == false){
+		return false;
+	}
+	return filesys_remove(file);			// Unix-like semantics for filesys_remove() are implemented.
+}
+
+int open (const char *file) {
+	//we need to check the address
+	if(check_addr(file) == false){
+		return -1;
+	}
+	struct file *f;
+	if(f = filesys_open(file) == NULL){
+		return -1;
+	}
+	for(int i = 2; i < 128; i++){
+		if(thread_current()->fdt[i] == NULL){
+			thread_current()->fdt[i] = f;
+			return i;
+		}
+	}
+	file_close(file);
+	return -1;
+}
+
+int filesize (int fd) {
+	if(check_fd(fd) == false){
+		return -1;
+	}
+	return file_length(thread_current()->fdt[fd]);
+}
+
+int read (int fd, void *buffer, unsigned size) {
+	//we need to check the address
+	if(check_addr(buffer) == false){
+		return -1;
+	}
+	if(fd == 0){
+		for(unsigned i = 0; i < size; i++){
+			*(char *)(buffer + i) = input_getc();
+			if(*(char *)(buffer + i) == '\0'){
+				return i;
+			} 
+		}
+		return size;
+	}
+	else if (check_fd(fd) == false){
+		return -1;
+	}
+	else{
+		lock_acquire(&sys_lock);
+		int byte = file_read(thread_current()->fdt[fd], buffer, size);
+		lock_release(&sys_lock);
+		return byte;
+	}
+}
+
+int write (int fd, const void *buffer, unsigned size) {
+	//we need to check the address
+	if(check_addr(buffer) == false){
+		return 0;
+	}
+	if(fd == 1){
+		putbuf(buffer, size);
+		return size;
+	}
+	else if (check_fd(fd) == false){
+		return 0;
+	}
+	else{
+		lock_acquire(&sys_lock);
+		int byte = file_write(thread_current()->fdt[fd], buffer, size);
+		lock_release(&sys_lock);
+		return byte;
+	}
+}
+
+void seek (int fd, unsigned position) {
+	if(check_fd(fd) == false){
+		return;
+	}
+	file_seek(thread_current()->fdt[fd], position);
+}
+
+unsigned tell (int fd) {
+	if(check_fd(fd) == false){
+		return -1;
+	}
+	return file_tell(thread_current()->fdt[fd]);
+}
+
+void close (int fd) {
+	if(check_fd(fd) == false){
+		return;
+	}
+	file_close(thread_current()->fdt[fd]);
+	thread_current()->fdt[fd] = NULL;
+}
+
+bool check_fd (int fd){
+	if((fd < 2) || (fd > 128)){
+		return false;
+	}
+	else if(thread_current()->fdt[fd] == NULL){
+		return false;
+	}
+	return true;
+}
+
+bool check_addr (void* addr){
+	if(addr == NULL){
+		return false;
+	}
+	else if(is_user_vaddr(addr) == false){
+		return false;
+	}
+	else if(pml4_get_page(thread_current()->pml4, addr) == NULL){
+		return false;
+	}
+	return true;
+}
+
+
 
 /* Project 2 */
 

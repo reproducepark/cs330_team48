@@ -112,6 +112,12 @@ struct thread {
 
 	/* Project 1 */
 
+	/* Project 2 */
+
+	struct file * fdt[128];
+
+	/* Project 2 */
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */

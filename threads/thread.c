@@ -467,6 +467,9 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->niceness = 0;
 	t->recent_cpu = 0;
 	/* Project 1 */
+	/* Project 2 */
+	memset (t->fdt, 0, sizeof(t->fdt));
+	/* Project 2 */
 	t->magic = THREAD_MAGIC;
 }
 

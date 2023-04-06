@@ -156,6 +156,5 @@ page_fault (struct intr_frame *f) {
 			write ? "writing" : "reading",
 			user ? "user" : "kernel");
 	exit(-1);
-	// kill (f);
 }
 

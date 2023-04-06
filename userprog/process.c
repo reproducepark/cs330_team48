@@ -198,7 +198,7 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 	/* Project 2 */
-	for(int i = 2; i < 10; i++){
+	for(int i = 2; i < 128; i++){
 		struct file * file = parent->fdt[i];
 		if(file == NULL){
 			continue;
@@ -248,7 +248,6 @@ process_exec (void *f_name) {
 
 	/* And then load the binary */
 	success = load (file_name, &_if);
-
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success)
@@ -284,8 +283,8 @@ process_wait (tid_t child_tid) {
 	for(struct list_elem *e = list_begin(child_list); e != list_end(child_list); e = list_next(e)){
 		struct thread *child = list_entry(e, struct thread, child_elem);
 		if(child->tid == child_tid){
-			list_remove(e);
 			sema_down(&child->parent_wait);
+			list_remove(e);
 			int exit_status = child->exit_status;
 			sema_up(&child->child_wait);
 			return exit_status;
@@ -304,7 +303,7 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	/* Project 2 */
-	for(int i = 2; i < 10; i++){
+	for(int i = 2; i < 128; i++){
 		struct file * file = curr->fdt[i];
 		if(file == NULL){
 			continue;

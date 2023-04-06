@@ -114,7 +114,7 @@ struct thread {
 
 	/* Project 2 */
 
-	struct file * fdt[10];
+	struct file ** fdt;
 	int exit_status;
 	struct list child_list;				/* List of child threads */
 	struct list_elem child_elem;		/* Element for child_list */

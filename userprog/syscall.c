@@ -86,7 +86,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			f->R.rax = fork(f->R.rdi, f);
 			break;
 		case SYS_EXEC:
-			f->R.rax = exec(f->R.rdi);
+			exec(f->R.rdi);
 			break;
 		case SYS_WAIT:	
 			f->R.rax = wait(f->R.rdi);
@@ -149,13 +149,13 @@ int exec (const char *cmd_line) {
 	}
 	char *fn_copy = palloc_get_page (0);
 	if (fn_copy == NULL){
-		return TID_ERROR;
+		exit(-1);
 	}
 	strlcpy (fn_copy, cmd_line, PGSIZE);
 	if(process_exec(fn_copy) == -1){
-		return -1;
+		exit(-1);
 	}
-	return 0;
+	NOT_REACHED();
 }
 
 int wait (pid_t pid) {

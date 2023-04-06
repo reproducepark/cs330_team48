@@ -198,7 +198,7 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 	/* Project 2 */
-	for(int i = 2; i < 10; i++){
+	for(int i = 2; i < 128; i++){
 		struct file * file = parent->fdt[i];
 		if(file == NULL){
 			continue;
@@ -304,13 +304,15 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	/* Project 2 */
-	for(int i = 2; i < 10; i++){
+	for(int i = 2; i < 128; i++){
 		struct file * file = curr->fdt[i];
 		if(file == NULL){
 			continue;
 		}
 		file_close(file);
 	}
+	file_close(curr->elf);
+	palloc_free_page(curr->fdt);
 	process_cleanup ();
 	sema_up(&curr->parent_wait);
 	sema_down(&curr->child_wait);
@@ -583,10 +585,9 @@ load (const char *file_name, struct intr_frame *if_) {
 done:
 	/* We arrive here whether the load is successful or not. */
 	/* Project 2 */
-	// free (fn_cpy);
 	palloc_free_page(fn_cpy);
+	t->elf = file;
 	/* Project 2 */
-	file_close (file);
 	return success;
 }
 

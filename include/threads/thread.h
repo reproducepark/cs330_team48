@@ -114,7 +114,13 @@ struct thread {
 
 	/* Project 2 */
 
-	struct file * fdt[128];
+	struct file * fdt[10];
+	int exit_status;
+	struct list child_list;				/* List of child threads */
+	struct list_elem child_elem;		/* Element for child_list */
+	struct semaphore fork_wait;
+	struct semaphore parent_wait;
+	struct semaphore child_wait;
 
 	/* Project 2 */
 

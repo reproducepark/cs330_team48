@@ -22,6 +22,13 @@
 #include "vm/vm.h"
 #endif
 
+/* Project 2 */
+#include <list.h>
+#include "threads/malloc.h"
+#include "userprog/syscall.h"
+#include <string.h>
+/* Project 2 */
+
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
@@ -41,6 +48,9 @@ process_init (void) {
 tid_t
 process_create_initd (const char *file_name) {
 	char *fn_copy;
+	/* Project 2 */
+	char *save_ptr;
+	/* Project 2 */
 	tid_t tid;
 
 	/* Make a copy of FILE_NAME.
@@ -49,7 +59,9 @@ process_create_initd (const char *file_name) {
 	if (fn_copy == NULL)
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
-
+	/* Project 2 */
+	file_name = strtok_r (file_name, " ", &save_ptr);
+	/* Project 2 */
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
@@ -74,10 +86,28 @@ initd (void *f_name) {
 /* Clones the current process as `name`. Returns the new process's thread id, or
  * TID_ERROR if the thread cannot be created. */
 tid_t
-process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+process_fork (const char *name, struct intr_frame *if_) {
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+	/* Project 2 */
+	struct ptr p;
+	p.parent = thread_current();
+	p.parent_if = if_;
+	struct ptr *pp = &p;
+	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, pp);
+	if(tid == TID_ERROR){
+		return TID_ERROR;
+	}
+	// get child struct from tid
+	struct thread *child;
+	for (struct list_elem *e = list_begin (&thread_current()->child_list); e != list_end (&thread_current()->child_list); e = list_next (e)){
+		child = list_entry (e, struct thread, child_elem);
+		if(child->tid == tid){
+			break;
+		}
+	}
+	sema_down(&child->fork_wait);
+	return tid;
+	/* Project 2 */
 }
 
 #ifndef VM
@@ -91,24 +121,37 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	void *newpage;
 	bool writable;
 
+	/* Project 2 */
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
-	if(is_kernel_vaddr(aux) == false){
-		return false;
+	// We already copied kernel page
+	if(is_kernel_vaddr(va) == true){
+		return true;
 	}
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page (parent->pml4, va);
+	if (parent_page == NULL){
+		return false;
+	}
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
-
+	newpage = palloc_get_page(PAL_USER);
+	if(newpage == NULL){
+		return false;
+	}
+	
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
-
+	memcpy(newpage, parent_page, PGSIZE);
+	writable = is_writable(pte);
+	
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
+		palloc_free_page(newpage);
+		return false;
 	}
 	return true;
 }
@@ -121,12 +164,16 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 static void
 __do_fork (void *aux) {
 	struct intr_frame if_;
-	struct thread *parent = (struct thread *) aux;
+	/* Project 2 */
+	struct thread *parent = ((struct ptr *)aux)->parent;
+	/* Project 2 */
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
 	struct intr_frame *parent_if;
 	bool succ = true;
-
+	/* Project 2 */
+	parent_if = ((struct ptr *)aux)->parent_if;
+	/* Project 2 */
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
 
@@ -150,13 +197,34 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
-
+	/* Project 2 */
+	for(int i = 2; i < 10; i++){
+		struct file * file = parent->fdt[i];
+		if(file == NULL){
+			continue;
+		}
+		struct file * nfile = file_duplicate(file);
+		if(nfile == NULL){
+			goto error;
+		}
+		current->fdt[i] = nfile;
+	}
+	
 	process_init ();
 
+	sema_up(&thread_current()->fork_wait);
 	/* Finally, switch to the newly created process. */
+
+	/* Project 2 */
+	if_.R.rax = 0;
+	/* Project 2 */
 	if (succ)
 		do_iret (&if_);
 error:
+	sema_up(&thread_current()->fork_wait);
+	exit(TID_ERROR);
+	//exit에 대한 고려 필요.
+	/* Project 2 */
 	thread_exit ();
 }
 
@@ -206,14 +274,26 @@ process_exec (void *f_name) {
  *
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
+/* Project 2 */
 int
-process_wait (tid_t child_tid UNUSED) {
+process_wait (tid_t child_tid) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	while(1){}
+	struct list *child_list = &thread_current()->child_list;
+	for(struct list_elem *e = list_begin(child_list); e != list_end(child_list); e = list_next(e)){
+		struct thread *child = list_entry(e, struct thread, child_elem);
+		if(child->tid == child_tid){
+			list_remove(e);
+			sema_down(&child->parent_wait);
+			int exit_status = child->exit_status;
+			sema_up(&child->child_wait);
+			return exit_status;
+		}
+	}
 	return -1;
 }
+/* Project 2 */
 
 /* Exit the process. This function is called by thread_exit (). */
 void
@@ -223,8 +303,18 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-
+	/* Project 2 */
+	for(int i = 2; i < 10; i++){
+		struct file * file = curr->fdt[i];
+		if(file == NULL){
+			continue;
+		}
+		file_close(file);
+	}
 	process_cleanup ();
+	sema_up(&curr->parent_wait);
+	sema_down(&curr->child_wait);
+	/* Project 2 */
 }
 
 /* Free the current process's resources. */
@@ -345,10 +435,14 @@ load (const char *file_name, struct intr_frame *if_) {
 	int argc = 0;
 	int fn_len = strlen (file_name);
 
-	fn_cpy = (char *)malloc (fn_len+1);
-	strlcpy (fn_cpy, file_name, fn_len+1);
+	// fn_cpy = (char *)malloc (fn_len+1);
+	fn_cpy = palloc_get_page(0);
+	//PGSIZE??
+	strlcpy (fn_cpy, file_name, PGSIZE);
 
 	file_name = strtok_r (fn_cpy, " ", &save_ptr);
+	// token = strtok_r (file_name, " ", &save_ptr);
+	// argv[argc] = file_name;
 	argv[argc] = file_name;
 	argc++;
 
@@ -371,6 +465,10 @@ load (const char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
+
+	/* Project 2 */
+	file_deny_write(file);
+	/* Project 2 */
 
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -485,7 +583,8 @@ load (const char *file_name, struct intr_frame *if_) {
 done:
 	/* We arrive here whether the load is successful or not. */
 	/* Project 2 */
-	free (fn_cpy);
+	// free (fn_cpy);
+	palloc_free_page(fn_cpy);
 	/* Project 2 */
 	file_close (file);
 	return success;

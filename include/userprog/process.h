@@ -10,4 +10,11 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_activate (struct thread *next);
 
+/* Project 2 */
+struct ptr{
+    struct thread *parent;
+    struct intr_frame *parent_if;
+};
+/* Project 2 */
+
 #endif /* userprog/process.h */

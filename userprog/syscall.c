@@ -12,11 +12,33 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "userprog/process.h"
+#include "threads/palloc.h"
+#include "devices/input.h"
 struct lock sys_lock;
 /* Project 2 */
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
+
+/* Project 2 */
+void halt (void);
+void exit (int status);
+pid_t fork (const char *thread_name, struct intr_frame *if_ );
+int exec (const char *cmd_line);
+int wait (pid_t pid);
+bool create (const char *file, unsigned initial_size);
+bool remove (const char *file);
+int open (const char *file);
+int filesize (int fd);
+int read (int fd, void *buffer, unsigned size);
+int write (int fd, const void *buffer, unsigned size);
+void seek (int fd, unsigned position);
+unsigned tell (int fd);
+void close (int fd);
+
+bool check_fd(int fd);
+bool check_addr(void *addr);
+/* Project 2 */
 
 /* System call.
  *
@@ -110,27 +132,30 @@ void halt (void) {
 
 void exit (int status) {
 	printf ("%s: exit(%d)\n", thread_current()->name, status);
+	thread_current()->exit_status = status;
 	thread_exit();
 }
 
 pid_t fork (const char *thread_name, struct intr_frame *if_ ) {
 	if(check_addr(thread_name) == false){
-		return -1;
+		exit(-1);
 	}
 	return process_fork(thread_name, if_);
 }
 
 int exec (const char *cmd_line) {
 	if(check_addr(cmd_line) == false){
-		return -1;
+		exit(-1);
 	}
 	char *fn_copy = palloc_get_page (0);
 	if (fn_copy == NULL){
 		return TID_ERROR;
 	}
 	strlcpy (fn_copy, cmd_line, PGSIZE);
-
-	return process_exec(fn_copy);
+	if(process_exec(fn_copy) == -1){
+		return -1;
+	}
+	return 0;
 }
 
 int wait (pid_t pid) {
@@ -141,7 +166,7 @@ int wait (pid_t pid) {
 bool create (const char *file, unsigned initial_size){
 	//we need to check the address
 	if(check_addr(file) == false){
-		return false;
+		exit(-1);
 	}
 	return filesys_create(file, initial_size);
 }
@@ -149,7 +174,7 @@ bool create (const char *file, unsigned initial_size){
 bool remove (const char *file) {
 	//we need to check the address
 	if(check_addr(file) == false){
-		return false;
+		exit(-1);
 	}
 	return filesys_remove(file);			// Unix-like semantics for filesys_remove() are implemented.
 }
@@ -157,13 +182,13 @@ bool remove (const char *file) {
 int open (const char *file) {
 	//we need to check the address
 	if(check_addr(file) == false){
-		return -1;
+		exit(-1);
 	}
 	struct file *f;
-	if(f = filesys_open(file) == NULL){
+	if((f = filesys_open(file)) == NULL){
 		return -1;
 	}
-	for(int i = 2; i < 128; i++){
+	for(int i = 2; i < 10; i++){
 		if(thread_current()->fdt[i] == NULL){
 			thread_current()->fdt[i] = f;
 			return i;
@@ -183,7 +208,7 @@ int filesize (int fd) {
 int read (int fd, void *buffer, unsigned size) {
 	//we need to check the address
 	if(check_addr(buffer) == false){
-		return -1;
+		exit(-1);
 	}
 	if(fd == 0){
 		for(unsigned i = 0; i < size; i++){
@@ -208,7 +233,7 @@ int read (int fd, void *buffer, unsigned size) {
 int write (int fd, const void *buffer, unsigned size) {
 	//we need to check the address
 	if(check_addr(buffer) == false){
-		return 0;
+		exit(-1);
 	}
 	if(fd == 1){
 		putbuf(buffer, size);
@@ -248,7 +273,7 @@ void close (int fd) {
 }
 
 bool check_fd (int fd){
-	if((fd < 2) || (fd > 128)){
+	if((fd < 2) || (fd > 10)){
 		return false;
 	}
 	else if(thread_current()->fdt[fd] == NULL){

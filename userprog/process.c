@@ -106,10 +106,11 @@ process_fork (const char *name, struct intr_frame *if_) {
 		}
 	}
 	sema_down(&child->fork_wait);
-	
+
 	if(child->exit_status == -1){
-		// sema_up(&child->exit_wait);
-		sema_up(&child->child_wait);
+		// sema_up(&child->parent_wait);
+		sema_up(&child->exit_wait);
+		// sema_up(&child->child_wait);
 		return TID_ERROR;
 	}
 
@@ -228,10 +229,11 @@ __do_fork (void *aux) {
 	if (succ)
 		do_iret (&if_);
 error:
-	sema_up(&thread_current()->fork_wait);
 	thread_current()->exit_status = -1;
-	// sema_down(&thread_current()->exit_wait);
-	sema_down(&thread_current()->child_wait);
+	sema_up(&thread_current()->fork_wait);
+	// sema_down(&thread_current()->parent_wait);
+	sema_down(&thread_current()->exit_wait);
+	// sema_down(&thread_current()->child_wait);
 	exit(TID_ERROR);
 	//exit에 대한 고려 필요.
 	/* Project 2 */
@@ -320,7 +322,8 @@ process_exit (void) {
 		file_close(file);
 	}
 	file_close(curr->elf);
-	palloc_free_page(curr->fdt);
+	// palloc_free_page(curr->fdt);
+	palloc_free_multiple(curr->fdt,3);
 	process_cleanup ();
 	sema_up(&curr->parent_wait);
 	sema_down(&curr->child_wait);

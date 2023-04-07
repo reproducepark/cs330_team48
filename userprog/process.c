@@ -107,7 +107,7 @@ process_fork (const char *name, struct intr_frame *if_) {
 	}
 	sema_down(&child->fork_wait);
 
-	if(child->exit_status == -1){
+	if(child->tid == -1){
 		// sema_up(&child->parent_wait);
 		sema_up(&child->exit_wait);
 		// sema_up(&child->child_wait);
@@ -229,7 +229,7 @@ __do_fork (void *aux) {
 	if (succ)
 		do_iret (&if_);
 error:
-	thread_current()->exit_status = -1;
+	thread_current()->tid = -1;
 	sema_up(&thread_current()->fork_wait);
 	// sema_down(&thread_current()->parent_wait);
 	sema_down(&thread_current()->exit_wait);

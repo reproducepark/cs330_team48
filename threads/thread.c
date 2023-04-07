@@ -211,8 +211,7 @@ thread_create (const char *name, int priority,
 	init_thread (t, name, priority);
 	tid = t->tid = allocate_tid ();
 	/* Project2 */
-	// t->fdt = palloc_get_page(PAL_ZERO);
-	t->fdt = palloc_get_multiple(PAL_ZERO, 3);
+	t->fdt = palloc_get_page(PAL_ZERO);
 	if(t->fdt == NULL)
 		return TID_ERROR;
 

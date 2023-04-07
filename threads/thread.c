@@ -237,7 +237,12 @@ thread_create (const char *name, int priority,
 	thread_unblock (t);
 	/* Project 1 */
 	if(check_to_yield()){
-		thread_yield();
+		if (!intr_context()) {
+            thread_yield ();
+        }
+		else{
+			intr_yield_on_return();
+		}
 	}
 	/* Project 1 */
 	return tid;
@@ -365,7 +370,12 @@ thread_set_priority (int new_priority) {
 	}
 
 	if(check_to_yield()){
-		thread_yield();
+		if (!intr_context()) {
+            thread_yield ();
+        }
+		else{
+			intr_yield_on_return();
+		}
 	}
 
 	/* Project 1 */

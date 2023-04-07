@@ -119,7 +119,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			close(f->R.rdi);
 			break;
 		default:
-			// exit(-1);
+			exit(-1);
 			break;
 	}
 	/* Project 2 */
@@ -273,7 +273,7 @@ void close (int fd) {
 }
 
 bool check_fd (int fd){
-	if((fd < 2) || (fd > 128)){
+	if((fd < 2) || (fd >= 128)){
 		return false;
 	}
 	else if(thread_current()->fdt[fd] == NULL){

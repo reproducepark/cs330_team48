@@ -223,11 +223,10 @@ __do_fork (void *aux) {
 	if (succ)
 		do_iret (&if_);
 error:
+	current->exit_status = -1;
 	sema_up(&thread_current()->fork_wait);
 	exit(TID_ERROR);
-	//exit에 대한 고려 필요.
 	/* Project 2 */
-	thread_exit ();
 }
 
 /* Switch the current execution context to the f_name.
@@ -313,7 +312,7 @@ process_exit (void) {
 		file_close(file);
 	}
 	file_close(curr->elf);
-	palloc_free_page(curr->fdt);
+	palloc_free_multiple(curr->fdt, 1);
 	process_cleanup ();
 	sema_up(&curr->parent_wait);
 	sema_down(&curr->child_wait);

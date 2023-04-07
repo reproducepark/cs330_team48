@@ -116,9 +116,11 @@ struct thread {
 
 	struct file ** fdt;
 	int exit_status;
+	int fork_status;
 	struct list child_list;				/* List of child threads */
 	struct list_elem child_elem;		/* Element for child_list */
 	struct semaphore fork_wait;
+	struct semaphore exit_wait;
 	struct semaphore parent_wait;
 	struct semaphore child_wait;
 	struct file * elf;

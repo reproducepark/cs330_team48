@@ -108,6 +108,7 @@ process_fork (const char *name, struct intr_frame *if_) {
 	sema_down(&child->fork_wait);
 	
 	if(child->exit_status == -1){
+		// sema_up(&child->exit_wait);
 		sema_up(&child->child_wait);
 		return TID_ERROR;
 	}
@@ -229,6 +230,7 @@ __do_fork (void *aux) {
 error:
 	sema_up(&thread_current()->fork_wait);
 	thread_current()->exit_status = -1;
+	// sema_down(&thread_current()->exit_wait);
 	sema_down(&thread_current()->child_wait);
 	exit(TID_ERROR);
 	//exit에 대한 고려 필요.

@@ -212,6 +212,8 @@ thread_create (const char *name, int priority,
 	tid = t->tid = allocate_tid ();
 	/* Project2 */
 	t->fdt = palloc_get_page(PAL_ZERO);
+	if(t->fdt == NULL)
+		return TID_ERROR;
 
 	/* Project2 */
 	/* Call the kernel_thread if it scheduled.

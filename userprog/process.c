@@ -106,6 +106,8 @@ process_fork (const char *name, struct intr_frame *if_) {
 		}
 	}
 	sema_down(&child->fork_wait);
+	if(child->exit_status == -1)
+		return TID_ERROR;
 	return tid;
 	/* Project 2 */
 }

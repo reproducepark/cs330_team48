@@ -212,8 +212,14 @@ thread_create (const char *name, int priority,
 	tid = t->tid = allocate_tid ();
 	/* Project2 */
 	t->fdt = palloc_get_page(PAL_ZERO);
-	if(t->fdt == NULL)
+	if(t->fdt == NULL){
+		// 필요하지 않을까?
+		palloc_free_page(t);
 		return TID_ERROR;
+	}
+		
+	t->exit_status = 0;
+	t->fork_status = 0;
 
 	/* Project2 */
 	/* Call the kernel_thread if it scheduled.

@@ -27,6 +27,7 @@
 #include "threads/malloc.h"
 #include "userprog/syscall.h"
 #include <string.h>
+extern struct semaphore sys_sema;
 /* Project 2 */
 
 static void process_cleanup (void);
@@ -50,6 +51,9 @@ process_create_initd (const char *file_name) {
 	char *fn_copy;
 	/* Project 2 */
 	char *save_ptr;
+	lock_init(&load_lock);
+	sema_init(&load_semaphore,1);
+	// sema_init(&sys_sema,1);
 	/* Project 2 */
 	tid_t tid;
 
@@ -257,11 +261,20 @@ process_exec (void *f_name) {
 	process_cleanup ();
 
 	/* And then load the binary */
+	// lock_acquire(&sys_lock);
+	// sema_down(&load_semaphore);
+	// lock_acquire(&load_lock);
 	success = load (file_name, &_if);
+	// lock_release(&sys_lock);
+	// sema_up(&load_semaphore);
+	
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
-	if (!success)
+	if (!success){
 		return -1;
+	}
+
+	// lock_release(&load_lock);
 
 	/* Project 2 */
 	// For debugging
@@ -321,7 +334,7 @@ process_exit (void) {
 		file_close(file);
 	}
 	file_close(curr->elf);
-	palloc_free_multiple(curr->fdt, 1);
+	palloc_free_page(curr->fdt);
 	process_cleanup ();
 	sema_up(&curr->parent_wait);
 	sema_down(&curr->child_wait);
@@ -447,16 +460,22 @@ load (const char *file_name, struct intr_frame *if_) {
 	int fn_len = strlen (file_name);
 
 	// fn_cpy = (char *)malloc (fn_len+1);
-	fn_cpy = palloc_get_page(0);
+	// fn_cpy = palloc_get_page(PAL_ZERO);
 	//PGSIZE??
-	strlcpy (fn_cpy, file_name, PGSIZE);
+	// strlcpy (fn_cpy, file_name, PGSIZE);
 
-	file_name = strtok_r (fn_cpy, " ", &save_ptr);
-	// token = strtok_r (file_name, " ", &save_ptr);
+	// file_name = strtok_r (fn_cpy, " ", &save_ptr);
 	// argv[argc] = file_name;
-	argv[argc] = file_name;
-	argc++;
+	// argc++;
 
+	// while((token = strtok_r (NULL, " ", &save_ptr)) != NULL){
+	// 	argv[argc] = token;
+	// 	argc++;
+	// }
+
+	token = strtok_r (file_name, " ", &save_ptr);
+	argv[argc] = token;
+	argc++;
 	while((token = strtok_r (NULL, " ", &save_ptr)) != NULL){
 		argv[argc] = token;
 		argc++;
@@ -468,20 +487,24 @@ load (const char *file_name, struct intr_frame *if_) {
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
 		goto done;
-	process_activate (thread_current ());
+	process_activate (t);
 
 	/* Open executable file. */
+	sema_down(&sys_sema);
 	file = filesys_open (file_name);
+	sema_up(&sys_sema);
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
-
+	
+	
 	/* Project 2 */
 	file_deny_write(file);
 	/* Project 2 */
 
 	/* Read and verify executable header. */
+	// sema_down(&sys_sema);
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
 			|| memcmp (ehdr.e_ident, "\177ELF\2\1\1", 7)
 			|| ehdr.e_type != 2
@@ -492,6 +515,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: error loading executable\n", file_name);
 		goto done;
 	}
+	// sema_up(&sys_sema);
 
 	/* Read program headers. */
 	file_ofs = ehdr.e_phoff;
@@ -545,6 +569,8 @@ load (const char *file_name, struct intr_frame *if_) {
 				break;
 		}
 	}
+	// lock_release(&sys_lock);
+	
 
 	/* Set up stack. */
 	if (!setup_stack (if_))
@@ -594,7 +620,7 @@ load (const char *file_name, struct intr_frame *if_) {
 done:
 	/* We arrive here whether the load is successful or not. */
 	/* Project 2 */
-	palloc_free_page(fn_cpy);
+	// palloc_free_page(fn_cpy);
 	t->elf = file;
 	/* Project 2 */
 	return success;

@@ -14,7 +14,7 @@
 #include "userprog/process.h"
 #include "threads/palloc.h"
 #include "devices/input.h"
-struct lock sys_lock;
+struct semaphore sys_sema;
 /* Project 2 */
 
 void syscall_entry (void);
@@ -66,7 +66,7 @@ syscall_init (void) {
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 	
 	/* Project 2 */
-	lock_init(&sys_lock);
+	sema_init(&sys_sema,1);
 	/* Project 2 */
 }
 
@@ -185,9 +185,11 @@ int open (const char *file) {
 		exit(-1);
 	}
 	struct file *f;
+	sema_down(&sys_sema);
 	if((f = filesys_open(file)) == NULL){
 		return -1;
 	}
+	sema_up(&sys_sema);
 	for(int i = 2; i < 128; i++){
 		if(thread_current()->fdt[i] == NULL){
 			thread_current()->fdt[i] = f;
@@ -223,9 +225,9 @@ int read (int fd, void *buffer, unsigned size) {
 		return -1;
 	}
 	else{
-		lock_acquire(&sys_lock);
+		sema_down(&sys_sema);
 		int byte = file_read(thread_current()->fdt[fd], buffer, size);
-		lock_release(&sys_lock);
+		sema_up(&sys_sema);
 		return byte;
 	}
 }
@@ -243,9 +245,9 @@ int write (int fd, const void *buffer, unsigned size) {
 		return 0;
 	}
 	else{
-		lock_acquire(&sys_lock);
+		sema_down(&sys_sema);
 		int byte = file_write(thread_current()->fdt[fd], buffer, size);
-		lock_release(&sys_lock);
+		sema_up(&sys_sema);
 		return byte;
 	}
 }
@@ -298,4 +300,3 @@ bool check_addr (void* addr){
 
 
 /* Project 2 */
-

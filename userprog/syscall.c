@@ -187,6 +187,7 @@ int open (const char *file) {
 	struct file *f;
 	sema_down(&sys_sema);
 	if((f = filesys_open(file)) == NULL){
+		sema_up(&sys_sema);
 		return -1;
 	}
 	sema_up(&sys_sema);

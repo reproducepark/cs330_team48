@@ -258,7 +258,9 @@ process_exec (void *f_name) {
 	process_cleanup ();
 
 	/* And then load the binary */
+	sema_down(&sys_sema);
 	success = load (file_name, &_if);
+	sema_up(&sys_sema);
 	
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
@@ -471,9 +473,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	process_activate (t);
 
 	/* Open executable file. */
-	sema_down(&sys_sema);
 	file = filesys_open (file_name);
-	sema_up(&sys_sema);
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
@@ -597,7 +597,7 @@ load (const char *file_name, struct intr_frame *if_) {
 done:
 	/* We arrive here whether the load is successful or not. */
 	/* Project 2 */
-	// palloc_free_page(fn_cpy);
+	palloc_free_page(fn_cpy);
 	t->elf = file;
 	/* Project 2 */
 	return success;

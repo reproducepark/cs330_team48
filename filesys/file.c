@@ -8,6 +8,9 @@ struct file {
 	struct inode *inode;        /* File's inode. */
 	off_t pos;                  /* Current position. */
 	bool deny_write;            /* Has file_deny_write() been called? */
+	/* Project 2 */
+	int open_cnt;               /* Number of openers. */
+	/* Project 2 */
 };
 
 /* Opens a file for the given INODE, of which it takes ownership,
@@ -20,6 +23,9 @@ file_open (struct inode *inode) {
 		file->inode = inode;
 		file->pos = 0;
 		file->deny_write = false;
+		/* Project 2 */
+		file->open_cnt = 1;
+		/* Project 2 */
 		return file;
 	} else {
 		inode_close (inode);
@@ -159,3 +165,22 @@ file_tell (struct file *file) {
 	ASSERT (file != NULL);
 	return file->pos;
 }
+
+/* Project 2 */
+int file_inc_cnt (struct file *file) {
+	ASSERT (file != NULL);
+	file->open_cnt ++;
+	return file->open_cnt;
+}
+
+int file_dec_cnt (struct file *file) {
+	ASSERT (file != NULL);
+	file->open_cnt --;
+	return file->open_cnt;
+}
+
+int file_get_cnt (struct file *file) {
+	ASSERT (file != NULL);
+	return file->open_cnt;
+}
+/* Project 2 */

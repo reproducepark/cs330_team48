@@ -19,6 +19,10 @@
 #include "threads/fixed-point.h"
 /* Project 1 */
 
+/* Project 2 */
+#include "filesys/file.h"
+/* Project 2 */
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -213,13 +217,11 @@ thread_create (const char *name, int priority,
 	/* Project2 */
 	t->fdt = palloc_get_page(PAL_ZERO);
 	if(t->fdt == NULL){
-		// 필요하지 않을까?
 		palloc_free_page(t);
 		return TID_ERROR;
 	}
-		
-	t->exit_status = 0;
-	t->fork_status = 0;
+	t->fdt[0] = STDIN_FP;
+	t->fdt[1] = STDOUT_FP;
 
 	/* Project2 */
 	/* Call the kernel_thread if it scheduled.
@@ -494,12 +496,14 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->recent_cpu = 0;
 	/* Project 1 */
 	/* Project 2 */
+	t->exit_status = 0;
+	t->fork_status = 0;
+
 	list_init(&t->child_list);
 	sema_init(&t->fork_wait, 0);
 	sema_init(&t->exit_wait, 0);
 	sema_init(&t->parent_wait, 0);
 	sema_init(&t->child_wait, 0);
-
 	/* Project 2 */
 	t->magic = THREAD_MAGIC;
 }

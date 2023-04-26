@@ -118,6 +118,9 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_CLOSE:
 			close(f->R.rdi);
 			break;
+		case SYS_DUP2:
+			f->R.rax = dup2(f->R.rdi, f->R.rsi);
+			break;
 		default:
 			exit(-1);
 			break;
@@ -191,7 +194,7 @@ int open (const char *file) {
 		return -1;
 	}
 	sema_up(&sys_sema);
-	for(int i = 2; i < 128; i++){
+	for(int i = 0; i < FDT_SIZE; i++){
 		if(thread_current()->fdt[i] == NULL){
 			thread_current()->fdt[i] = f;
 			return i;
@@ -205,6 +208,11 @@ int filesize (int fd) {
 	if(check_fd(fd) == false){
 		return -1;
 	}
+	struct file *f = thread_current()->fdt[fd];
+	if(f == STDIN_FP || f == STDOUT_FP){
+		return -1;
+	}
+
 	return file_length(thread_current()->fdt[fd]);
 }
 
@@ -213,7 +221,12 @@ int read (int fd, void *buffer, unsigned size) {
 	if(check_addr(buffer) == false){
 		exit(-1);
 	}
-	if(fd == 0){
+	if(check_fd(fd) == false){
+		return -1;
+	}
+	struct file *f = thread_current()->fdt[fd];
+
+	if(f == STDIN_FP){
 		for(unsigned i = 0; i < size; i++){
 			*(char *)(buffer + i) = input_getc();
 			if(*(char *)(buffer + i) == '\0'){
@@ -222,7 +235,7 @@ int read (int fd, void *buffer, unsigned size) {
 		}
 		return size;
 	}
-	else if (check_fd(fd) == false){
+	else if(f == STDOUT_FP){
 		return -1;
 	}
 	else{
@@ -238,12 +251,17 @@ int write (int fd, const void *buffer, unsigned size) {
 	if(check_addr(buffer) == false){
 		exit(-1);
 	}
-	if(fd == 1){
+	if(check_fd(fd) == false){
+		return -1;
+	}
+	struct file *f = thread_current()->fdt[fd];
+
+	if(f == STDOUT_FP){
 		putbuf(buffer, size);
 		return size;
 	}
-	else if (check_fd(fd) == false){
-		return 0;
+	else if (f == STDIN_FP){
+		return -1;
 	}
 	else{
 		sema_down(&sys_sema);
@@ -257,11 +275,19 @@ void seek (int fd, unsigned position) {
 	if(check_fd(fd) == false){
 		return;
 	}
+	struct file *f = thread_current()->fdt[fd];
+	if(f == STDIN_FP || f == STDOUT_FP){
+		return -1;
+	}
 	file_seek(thread_current()->fdt[fd], position);
 }
 
 unsigned tell (int fd) {
 	if(check_fd(fd) == false){
+		return -1;
+	}
+	struct file *f = thread_current()->fdt[fd];
+	if(f == STDIN_FP || f == STDOUT_FP){
 		return -1;
 	}
 	return file_tell(thread_current()->fdt[fd]);
@@ -271,12 +297,15 @@ void close (int fd) {
 	if(check_fd(fd) == false){
 		return;
 	}
-	file_close(thread_current()->fdt[fd]);
+	struct file *f = thread_current()->fdt[fd];
+	if(f != STDOUT_FP && f != STDIN_FP && file_dec_cnt(f) == 0){
+		file_close(f);
+	}
 	thread_current()->fdt[fd] = NULL;
 }
 
 bool check_fd (int fd){
-	if((fd < 2) || (fd >= 128)){
+	if((fd < 0) || (fd >= FDT_SIZE)){
 		return false;
 	}
 	else if(thread_current()->fdt[fd] == NULL){
@@ -298,6 +327,24 @@ bool check_addr (void* addr){
 	return true;
 }
 
+int dup2(int oldfd, int newfd){
+	if(check_fd(oldfd) == false){
+		return -1;
+	}
+	if(newfd == oldfd){
+		return newfd;
+	}
 
+	struct file *f = thread_current()->fdt[oldfd];
+	struct file *f_old_0 = thread_current()->fdt[0];
+	struct file *f_old_1 = thread_current()->fdt[1];
+	close(newfd);
+	if(f != STDOUT_FP && f != STDIN_FP){
+		file_inc_cnt(f);
+	}
+	
+	thread_current()->fdt[newfd] = f;
+	return newfd;
+}
 
 /* Project 2 */

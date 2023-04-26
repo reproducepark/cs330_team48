@@ -15,6 +15,8 @@ struct ptr{
     struct thread *parent;
     struct intr_frame *parent_if;
 };
+
+#define FDT_SIZE 512
 /* Project 2 */
 
 #endif /* userprog/process.h */

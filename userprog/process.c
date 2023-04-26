@@ -207,18 +207,42 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 	/* Project 2 */
-	for(int i = 2; i < 128; i++){
-		struct file * file = parent->fdt[i];
-		if(file == NULL){
+	char chk[FDT_SIZE] = {0,};
+	for(int i = 0; i < FDT_SIZE; i++){
+		if(chk[i] == 1){
 			continue;
 		}
-		struct file * nfile = file_duplicate(file);
-		if(nfile == NULL){
+		struct file * file = parent->fdt[i];
+		if(parent->fdt[i] == NULL){
+			chk[i] = 1;
+		}
+		else if(parent->fdt[i] == STDIN_FP || parent->fdt[i] == STDOUT_FP){
+			chk[i] = 1;
+			current->fdt[i] = parent->fdt[i];
+		}
+		else if(file_get_cnt(file) < 1){
 			goto error;
 		}
-		current->fdt[i] = nfile;
+		else{
+			struct file * nfile = file_duplicate(file);
+			if(nfile == NULL){
+				goto error;
+			}
+			current->fdt[i] = nfile;
+			chk[i] = 1;
+			for(int j = i + 1; j < FDT_SIZE; j++){
+				if(chk[j] == 1){
+					continue;
+				}
+				if(parent->fdt[j] == file){
+					current->fdt[j] = nfile;
+					file_inc_cnt(nfile);
+					chk[j] = 1;
+				}
+			}
+		}
 	}
-	
+
 	process_init ();
 
 	sema_up(&thread_current()->fork_wait);
@@ -232,9 +256,7 @@ __do_fork (void *aux) {
 error:
 	thread_current()->fork_status = -1;
 	sema_up(&thread_current()->fork_wait);
-	// sema_down(&thread_current()->parent_wait);
 	sema_down(&thread_current()->exit_wait);
-	// sema_down(&thread_current()->child_wait);
 	exit(TID_ERROR);
 	/* Project 2 */
 }
@@ -318,12 +340,14 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	/* Project 2 */
-	for(int i = 2; i < 128; i++){
-		struct file * file = curr->fdt[i];
-		if(file == NULL){
+	for(int i = 0; i < FDT_SIZE; i++){
+		struct file * f = curr->fdt[i];
+		if(f == NULL || f == STDIN_FP || f == STDOUT_FP){
 			continue;
 		}
-		file_close(file);
+		else if(file_dec_cnt(f) == 0){
+			file_close(f);
+		}
 	}
 	file_close(curr->elf);
 	palloc_free_page(curr->fdt);

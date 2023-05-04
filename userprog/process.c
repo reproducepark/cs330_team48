@@ -185,7 +185,6 @@ __do_fork (void *aux) {
 	/* Project 2 */
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
-
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
 	if (current->pml4 == NULL)
@@ -277,13 +276,16 @@ process_exec (void *f_name) {
 	_if.eflags = FLAG_IF | FLAG_MBS;
 
 	/* We first kill the current context */
+	// ASSERT(0);
 	process_cleanup ();
-
+	// ASSERT(0);
 	/* And then load the binary */
 	sema_down(&sys_sema);
+	// ASSERT(0);
 	success = load (file_name, &_if);
+	// ASSERT(0);
 	sema_up(&sys_sema);
-	
+	// ASSERT(0);
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success){
@@ -477,6 +479,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	// fn_cpy = (char *)malloc (fn_len+1);
 	fn_cpy = palloc_get_page(PAL_ZERO);
+	// ASSERT(0);
 	strlcpy (fn_cpy, file_name, PGSIZE);
 
 	file_name = strtok_r (fn_cpy, " ", &save_ptr);
@@ -495,7 +498,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	if (t->pml4 == NULL)
 		goto done;
 	process_activate (t);
-
+	// ASSERT(0);
 	/* Open executable file. */
 	file = filesys_open (file_name);
 	if (file == NULL) {
@@ -572,11 +575,13 @@ load (const char *file_name, struct intr_frame *if_) {
 				break;
 		}
 	}
+
+	// ASSERT (0);
 	
 	/* Set up stack. */
 	if (!setup_stack (if_))
 		goto done;
-
+	// ASSERT(0);
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
@@ -588,16 +593,18 @@ load (const char *file_name, struct intr_frame *if_) {
 	for(int i = argc - 1; i >= 0; i--){
 		int len = strlen(argv[i]);
 		if_->rsp -= (len+1);
-		strlcpy((char *)if_->rsp, argv[i], len + 1);
+		// 문제지점
+
+		strlcpy((char *)&if_->rsp, argv[i], len + 1);
+
 		argv[i] = if_->rsp;
 	}
-	
+	// ASSERT(0);
 	// for padding
 	while(if_->rsp % 8 != 0){
 		if_->rsp --;
 		memset(if_->rsp, 0, sizeof(uint8_t));
 	}
-
 	// for argv
 	if_->rsp -= sizeof(char *);
 	memset(if_->rsp, 0, sizeof(char*));
@@ -617,11 +624,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Project 2 */
 
 	success = true;
-
+	// ASSERT (0);
 done:
 	/* We arrive here whether the load is successful or not. */
 	/* Project 2 */
 	palloc_free_page(fn_cpy);
+	// ASSERT(0);
 	t->elf = file;
 	/* Project 2 */
 	return success;
@@ -781,6 +789,27 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
+	/* Project 3 */
+	struct load_info * info = (struct load_info *)aux;
+	struct file *file = info->file;
+	uint32_t read_bytes = info->page_read_bytes;
+	uint32_t zero_bytes = info->page_zero_bytes;
+	struct frame *frame = page->frame;
+
+	off_t ofs = info->ofs;
+
+	file_seek (file, ofs);	/* Load this page. */
+	if (file_read (file, frame->kva, read_bytes) != (int) read_bytes) {
+		palloc_free_page (frame->kva);
+		// free(page);
+		// 여기서 할지 아면 swap_in에서 할지??
+		free(aux);
+		return false;
+	}
+	memset (frame->kva + read_bytes, 0, zero_bytes);
+
+	free(aux);
+	/* Project 3 */
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -804,6 +833,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 	ASSERT (pg_ofs (upage) == 0);
 	ASSERT (ofs % PGSIZE == 0);
 
+	file_seek(file, ofs);
 	while (read_bytes > 0 || zero_bytes > 0) {
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
@@ -812,16 +842,28 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
-		void *aux = NULL;
+		/* Project 3 */
+		struct load_info * info = malloc(sizeof(struct load_info));
+		info->file = file;
+		info->ofs = ofs;
+		info->page_read_bytes = page_read_bytes;
+		info->page_zero_bytes = page_zero_bytes;
+		void *aux = info;
+		/* Project 3 */
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, aux))
+					writable, lazy_load_segment, aux)){
 			return false;
-
+		}
+		// ASSERT (0);
 		/* Advance. */
+		// /* Project 3 */
+		// ofs += page_read_bytes;
+		// /* Project 3 */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
-	}
+
+		ofs += page_read_bytes;	}
 	return true;
 }
 
@@ -835,7 +877,21 @@ setup_stack (struct intr_frame *if_) {
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
+	/* Project 3 */
+	if(vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, true) && (vm_claim_page(stack_bottom))){
+		if_->rsp = USER_STACK;
+		return true;
+	}
+	
 
+
+	// if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1)) {    // type, upage, writable
+	// 	success = vm_claim_page(stack_bottom);
+	// 	if (success) {
+	// 		if_->rsp = USER_STACK;
+	// 	}
+	// }
+	/* Project 3 */
 	return success;
-}
+	}
 #endif /* VM */

@@ -37,10 +37,8 @@
 static struct list ready_list;
 
 /* Project 1 */
-
 struct list sleep_list;	/* List for sleeping threads. */
 int load_avg;
-
 /* Project 1 */
 
 /* Idle thread. */
@@ -120,9 +118,9 @@ thread_init (void) {
 	};
 	lgdt (&gdt_ds);
 
-	/* Project 1*/
+	/* Project 1 */
 	list_init (&sleep_list);
-	/* Project 1*/
+	/* Project 1 */
 
 	/* Init the globla thread context */
 	lock_init (&tid_lock);

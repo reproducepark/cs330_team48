@@ -2,6 +2,9 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
+/* Project 3 */
+#include <hash.h>
+/* Project 3 */
 
 enum vm_type {
 	/* page not initialized */
@@ -46,6 +49,10 @@ struct page {
 	struct frame *frame;   /* Back reference for frame */
 
 	/* Your implementation */
+	/* Project 3 */
+	struct hash_elem spt_elem;
+	bool writable;
+	/* Project 3 */
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -63,6 +70,9 @@ struct page {
 struct frame {
 	void *kva;
 	struct page *page;
+	/* Project 3 */
+	struct list_elem ft_elem;
+	/* Project 3 */
 };
 
 /* The function table for page operations.
@@ -85,7 +95,20 @@ struct page_operations {
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
 struct supplemental_page_table {
+	/* Project 3 */
+	struct hash spt_hash_table;
+	/* Project 3 */
 };
+
+/* Project 3 */
+/* Structure for lazy load. It contains necessary informations for loading of binary.*/
+struct load_info {
+	struct file *file;
+	off_t ofs;
+	uint32_t page_read_bytes;
+	uint32_t page_zero_bytes;
+};
+/* Project 3 */
 
 #include "threads/thread.h"
 void supplemental_page_table_init (struct supplemental_page_table *spt);
@@ -108,5 +131,10 @@ bool vm_alloc_page_with_initializer (enum vm_type type, void *upage,
 void vm_dealloc_page (struct page *page);
 bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
+
+/* Project 3 */
+uint64_t spt_hash_func (const struct hash_elem *e, void *aux UNUSED);
+bool spt_hash_less_func (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED);
+/* Project 3 */
 
 #endif  /* VM_VM_H */

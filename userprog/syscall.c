@@ -336,6 +336,8 @@ int dup2(int oldfd, int newfd){
 	}
 
 	struct file *f = thread_current()->fdt[oldfd];
+	struct file *f_old_0 = thread_current()->fdt[0];
+	struct file *f_old_1 = thread_current()->fdt[1];
 	close(newfd);
 	if(f != STDOUT_FP && f != STDIN_FP){
 		file_inc_cnt(f);

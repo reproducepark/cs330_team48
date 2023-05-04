@@ -347,7 +347,7 @@ process_exit (void) {
 		if(f == NULL || f == STDIN_FP || f == STDOUT_FP){
 			continue;
 		}
-		else if(file_dec_cnt(f) == 0){
+		if(file_dec_cnt(f) == 0){
 			file_close(f);
 		}
 	}

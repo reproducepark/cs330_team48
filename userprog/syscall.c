@@ -322,6 +322,11 @@ bool check_addr (void* addr){
 		return false;
 	}
 	else if(pml4_get_page(thread_current()->pml4, addr) == NULL){
+		#ifdef VM
+			if(spt_find_page(&thread_current()->spt, addr) != NULL){
+				return true;
+			}
+		#endif
 		return false;
 	}
 	return true;

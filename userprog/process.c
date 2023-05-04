@@ -584,7 +584,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	// ASSERT(0);
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
-
 	/* Project 2 */
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
@@ -595,16 +594,17 @@ load (const char *file_name, struct intr_frame *if_) {
 		if_->rsp -= (len+1);
 		// 문제지점
 
-		strlcpy((char *)&if_->rsp, argv[i], len + 1);
-
+		strlcpy((char *)if_->rsp, argv[i], len + 1);
+		
 		argv[i] = if_->rsp;
 	}
-	// ASSERT(0);
+
 	// for padding
 	while(if_->rsp % 8 != 0){
 		if_->rsp --;
 		memset(if_->rsp, 0, sizeof(uint8_t));
 	}
+
 	// for argv
 	if_->rsp -= sizeof(char *);
 	memset(if_->rsp, 0, sizeof(char*));
@@ -624,12 +624,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Project 2 */
 
 	success = true;
-	// ASSERT (0);
+
 done:
 	/* We arrive here whether the load is successful or not. */
 	/* Project 2 */
 	palloc_free_page(fn_cpy);
-	// ASSERT(0);
+
 	t->elf = file;
 	/* Project 2 */
 	return success;
@@ -809,6 +809,7 @@ lazy_load_segment (struct page *page, void *aux) {
 	memset (frame->kva + read_bytes, 0, zero_bytes);
 
 	free(aux);
+	return true;
 	/* Project 3 */
 }
 
@@ -852,6 +853,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		/* Project 3 */
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
 					writable, lazy_load_segment, aux)){
+			free(aux);
 			return false;
 		}
 		// ASSERT (0);
@@ -863,7 +865,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
 
-		ofs += page_read_bytes;	}
+		ofs += page_read_bytes;
+	}
 	return true;
 }
 

@@ -261,10 +261,10 @@ vm_do_claim_page (struct page *page) {
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	/* Project 3 */
-	if(pml4_get_page (&thread_current()->pml4, page->va) != NULL){
+	if(pml4_get_page (thread_current()->pml4, page->va) != NULL){
 		return false;
 	}
-	if(pml4_set_page(&thread_current()->pml4, page->va, frame->kva, page->writable) == false){
+	if(pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable) == false){
 		return false;
 	}
 	return swap_in (page, frame->kva);
@@ -346,7 +346,8 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 			file_write_at(page->file.file, page->frame->kva, page->file.page_read_bytes, page->file.ofs);
 		}
 		free(page->frame);
-		vm_dealloc_page(page);
+		destroy(page);
+		// vm_dealloc_page(page); 왜??
 	}
 	 /* Project 3 */
 }

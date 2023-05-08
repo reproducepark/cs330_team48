@@ -569,12 +569,10 @@ load (const char *file_name, struct intr_frame *if_) {
 		}
 	}
 
-	// ASSERT (0);
 	
 	/* Set up stack. */
 	if (!setup_stack (if_))
 		goto done;
-	// ASSERT(0);
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 	/* Project 2 */
@@ -849,11 +847,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 			free(aux);
 			return false;
 		}
-		// ASSERT (0);
 		/* Advance. */
-		// /* Project 3 */
-		// ofs += page_read_bytes;
-		// /* Project 3 */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;

@@ -211,12 +211,11 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr,
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
 	struct supplemental_page_table *spt = &thread_current ()->spt;
 	/* Project 3 */
+	if(check_addr(addr) == false)
+		return false;
 	struct page *page = spt_find_page(spt, addr);
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
-	// if(page->frame != NULL){
-	// 	return swap_in(page, page->frame->kva);
-	// }
 	/* Project 3 */
 	return vm_do_claim_page (page);
 }
@@ -344,6 +343,7 @@ supplemental_page_table_kill (struct supplemental_page_table *spt) {
 		}
 		destroy(page);
 	}
+	hash_clear(&spt->spt_hash_table, NULL);
 	 /* Project 3 */
 }
 

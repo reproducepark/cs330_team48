@@ -165,12 +165,7 @@ static struct frame *
 vm_evict_frame (void) {
 	struct frame *victim = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
-	// if(){
-		swap_out(victim->page);
-	// }
-	// else if() {
-	// 	anon_swap_out(victim->page);
-	// }
+	swap_out(victim->page);
 	return victim;
 }
 
@@ -289,14 +284,12 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 		switch(VM_TYPE(page->operations->type)){
 			case VM_UNINIT:
 				{
-				struct load_info * aux = NULL;
-				if(VM_TYPE(page->uninit.type) == VM_FILE){
-					aux = (struct load_info *)malloc(sizeof(struct load_info *));
-					memcpy(aux, (struct load_info *)page->uninit.aux, sizeof(struct load_info));
+				struct load_info * aux = malloc(sizeof(struct load_info));
+				memcpy(aux, (struct load_info *)page->uninit.aux, sizeof(struct load_info));
+				if(aux->file != NULL){
 					aux->file = file_reopen(aux->file);
 				}
 				vm_alloc_page_with_initializer(page->uninit.type, page->va, page->writable, page->uninit.init, aux);
-				// 이렇게 할까? 깃북에서 하라는데...
 				vm_claim_page(page->va);
 				break;
 				}
@@ -306,7 +299,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 				struct file * file = file_reopen(page->file.file);
 
 				file_seek(file, info->ofs);
-				if(!vm_alloc_page(VM_FILE, page->va, page->writable))
+				if(!vm_alloc_page(page->operations->type, page->va, page->writable))
 					return false;
 				struct page * dst_page = spt_find_page(dst, page->va);
 				dst_page->file.file = file;
@@ -318,11 +311,14 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 				}
 			case VM_ANON:
 				{
-				if(!vm_alloc_page(VM_ANON, page->va, page->writable))
+				if(vm_alloc_page(page->operations->type, page->va, page->writable) == false){
 					return false;
+				}
 				struct page * dst_page = spt_find_page(dst, page->va);
-				vm_do_claim_page(dst_page);
-				memcpy(dst_page->frame, page->frame, sizeof(struct frame));
+				if(vm_do_claim_page(dst_page) == false){
+					return false;
+				}
+				memcpy(dst_page->frame->kva, page->frame->kva, PGSIZE);
 				break;
 				}
 
@@ -334,10 +330,11 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 
 /* Free the resource hold by the supplemental page table */
 void
-supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
+supplemental_page_table_kill (struct supplemental_page_table *spt) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
 	 /* Project 3 */
+
 	struct hash_iterator i;
 	hash_first(&i, &thread_current()->spt.spt_hash_table);
 	while (hash_next(&i)){
@@ -345,9 +342,7 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 		if((page->operations->type == VM_FILE) && pml4_is_dirty(thread_current()->pml4, page->va)){
 			file_write_at(page->file.file, page->frame->kva, page->file.page_read_bytes, page->file.ofs);
 		}
-		free(page->frame);
 		destroy(page);
-		// vm_dealloc_page(page); 왜??
 	}
 	 /* Project 3 */
 }

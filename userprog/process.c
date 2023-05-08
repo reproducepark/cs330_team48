@@ -189,8 +189,8 @@ __do_fork (void *aux) {
 	current->pml4 = pml4_create();
 	if (current->pml4 == NULL)
 		goto error;
-
 	process_activate (current);
+
 #ifdef VM
 	supplemental_page_table_init (&current->spt);
 	if (!supplemental_page_table_copy (&current->spt, &parent->spt))
@@ -276,16 +276,11 @@ process_exec (void *f_name) {
 	_if.eflags = FLAG_IF | FLAG_MBS;
 
 	/* We first kill the current context */
-	// ASSERT(0);
 	process_cleanup ();
-	// ASSERT(0);
 	/* And then load the binary */
 	sema_down(&sys_sema);
-	// ASSERT(0);
 	success = load (file_name, &_if);
-	// ASSERT(0);
 	sema_up(&sys_sema);
-	// ASSERT(0);
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success){
@@ -365,7 +360,8 @@ process_cleanup (void) {
 	struct thread *curr = thread_current ();
 
 #ifdef VM
-	supplemental_page_table_kill (&curr->spt);
+	if(!hash_empty(&curr->spt.spt_hash_table))
+		supplemental_page_table_kill (&curr->spt);
 #endif
 
 	uint64_t *pml4;
@@ -477,9 +473,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	int argc = 0;
 	int fn_len = strlen (file_name);
 
-	// fn_cpy = (char *)malloc (fn_len+1);
 	fn_cpy = palloc_get_page(PAL_ZERO);
-	// ASSERT(0);
 	strlcpy (fn_cpy, file_name, PGSIZE);
 
 	file_name = strtok_r (fn_cpy, " ", &save_ptr);
@@ -498,7 +492,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	if (t->pml4 == NULL)
 		goto done;
 	process_activate (t);
-	// ASSERT(0);
 	/* Open executable file. */
 	file = filesys_open (file_name);
 	if (file == NULL) {

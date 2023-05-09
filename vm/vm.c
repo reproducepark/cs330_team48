@@ -197,7 +197,15 @@ vm_get_frame (void) {
 
 /* Growing the stack. */
 static void
-vm_stack_growth (void *addr UNUSED) {
+vm_stack_growth (void *addr) {
+	int pgnum = (thread_current()->stack_bottom - (uintptr_t)pg_round_down(addr)) / PGSIZE;
+	// printf("%d\n", pgnum);
+	for(int i = 1 ; i <= pgnum ; i++){
+		// printf("%d\n", i);
+		vm_alloc_page(VM_ANON | VM_MARKER_0, thread_current()->stack_bottom - PGSIZE*i, true);
+		vm_claim_page(thread_current()->stack_bottom + PGSIZE*i);
+	}
+	thread_current()->stack_bottom = pg_round_down(addr);
 }
 
 /* Handle the fault on write_protected page */
@@ -207,12 +215,27 @@ vm_handle_wp (struct page *page UNUSED) {
 
 /* Return true on success */
 bool
-vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr,
-		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
+vm_try_handle_fault (struct intr_frame *f, void *addr,
+		bool user, bool write UNUSED, bool not_present UNUSED) {
 	struct supplemental_page_table *spt = &thread_current ()->spt;
 	/* Project 3 */
-	if(check_addr(addr) == false)
+
+	if(check_addr(addr) == false){
+		
+		if(is_user_vaddr(addr) == false){
+			return false;
+		}
+		if(user == true){
+			thread_current()->ursp = f->rsp;
+		}
+		if((USER_STACK - 0x100000 <= thread_current()->ursp - 8) && (thread_current()->ursp - 8 <= addr)){
+			vm_stack_growth(addr);
+			return true;
+		}
 		return false;
+	}
+
+
 	struct page *page = spt_find_page(spt, addr);
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */

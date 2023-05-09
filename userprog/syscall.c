@@ -17,6 +17,10 @@
 struct semaphore sys_sema;
 /* Project 2 */
 
+/* Project 3 */
+#include "vm/vm.h"
+/* Project 3 */
+
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 
@@ -39,6 +43,11 @@ void close (int fd);
 bool check_fd(int fd);
 bool check_addr(void *addr);
 /* Project 2 */
+
+/* Project 3 */
+void * mmap(void * addr, size_t length, int writable, int fd, off_t offset);
+void munmap(void * addr);
+/* Project 3 */
 
 /* System call.
  *
@@ -72,9 +81,10 @@ syscall_init (void) {
 
 /* The main system call interface */
 void
-syscall_handler (struct intr_frame *f UNUSED) {
+syscall_handler (struct intr_frame *f) {
 	// TODO: Your implementation goes here.
 	/* Project 2 */
+	thread_current()->ursp = f->rsp;
 	switch(f->R.rax){
 		case SYS_HALT:
 			halt();
@@ -121,6 +131,14 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_DUP2:
 			f->R.rax = dup2(f->R.rdi, f->R.rsi);
 			break;
+		/* Project 3 */
+		case SYS_MMAP:
+			f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+			break;
+		case SYS_MUNMAP:
+			munmap(f->R.rdi);
+			break;
+		/* Project 3 */
 		default:
 			exit(-1);
 			break;
@@ -353,3 +371,36 @@ int dup2(int oldfd, int newfd){
 }
 
 /* Project 2 */
+
+/* Project 3 */
+void * mmap(void * addr, size_t length, int writable, int fd, off_t offset){
+	if((addr == NULL) || (is_user_vaddr(addr) == false) || (addr != pg_round_down(addr))){
+		return NULL;
+	}
+	if(check_fd(fd) == false){
+		return NULL;
+	}
+	struct file *f = thread_current()->fdt[fd];
+	if(f == STDIN_FP || f == STDOUT_FP){
+		return NULL;
+	}
+	if(length == 0){
+		return NULL;
+	}
+	if(spt_find_page(&thread_current()->spt, addr) != NULL){
+		return NULL;
+	}
+	
+	return do_mmap(addr, length, writable, f, offset);
+}
+
+void munmap(void * addr){
+	if((addr == NULL) || (is_user_vaddr(addr) == false) || (addr != pg_round_down(addr))){
+		return NULL;
+	}
+	struct page * page = spt_find_page(&thread_current()->spt, addr);
+	if(page_get_type(page) == VM_FILE){
+		do_munmap(addr);
+	}
+}
+/* Project 3 */

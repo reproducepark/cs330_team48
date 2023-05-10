@@ -391,6 +391,7 @@ void * mmap(void * addr, size_t length, int writable, int fd, off_t offset){
 		return NULL;
 	}
 	
+	// ASSERT(0);
 	return do_mmap(addr, length, writable, f, offset);
 }
 

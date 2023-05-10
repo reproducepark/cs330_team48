@@ -70,6 +70,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 			goto err;
 		}
 		if(VM_TYPE(type) == VM_FILE){
+			new_page->mmap_id = ((struct load_info *)aux)->mmap_id;
 			uninit_new(new_page, upage, init, type, aux, file_backed_initializer);
 		}
 		else if(VM_TYPE(type) == VM_ANON){

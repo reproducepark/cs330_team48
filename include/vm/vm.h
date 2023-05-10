@@ -52,6 +52,7 @@ struct page {
 	/* Project 3 */
 	struct hash_elem spt_elem;
 	bool writable;
+	int64_t mmap_id;
 	/* Project 3 */
 
 	/* Per-type data are binded into the union.
@@ -107,6 +108,7 @@ struct load_info {
 	off_t ofs;
 	uint32_t page_read_bytes;
 	uint32_t page_zero_bytes;
+	int64_t mmap_id;
 };
 /* Project 3 */
 

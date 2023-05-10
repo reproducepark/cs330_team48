@@ -56,9 +56,11 @@ do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
 	/* Project 3 */
 	file_seek(file, offset);
-	size_t read_bytes = length;
-	size_t zero_bytes = PGSIZE - length % PGSIZE;
+	size_t read_bytes = length > file_length(file) ? file_length(file) : length;
+	size_t zero_bytes = PGSIZE - read_bytes % PGSIZE;
 	void *upage = addr;
+	int64_t mmap_id = timer_ticks();
+	// printf("rd: %d %d\n",read_bytes, zero_bytes);
 	while (read_bytes > 0 || zero_bytes > 0) {
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
@@ -70,6 +72,7 @@ do_mmap (void *addr, size_t length, int writable,
 		info->ofs = offset;
 		info->page_read_bytes = page_read_bytes;
 		info->page_zero_bytes = page_zero_bytes;
+		info->mmap_id = mmap_id;
 		void *aux = info;
 		/* Project 3 */
 		if (!vm_alloc_page_with_initializer (VM_FILE, upage,
@@ -91,6 +94,21 @@ do_mmap (void *addr, size_t length, int writable,
 void
 do_munmap (void *addr) {
 	/* Project 3 */
+	struct page* page = spt_find_page(&thread_current()->spt, addr);
+	int64_t mmap_id = page->mmap_id;
+	if(mmap_id == 0){
+		return;
+	}
 	
+	while(page->mmap_id == mmap_id){
+		if(pml4_is_dirty(thread_current()->pml4, page->va)){
+			file_write_at(page->file.file, page->frame->kva, page->file.page_read_bytes, page->file.ofs);
+		}
+		pml4_clear_page(thread_current()->pml4, page->va);
+		hash_delete(&thread_current()->spt, &page->spt_elem);
+		destroy(page);
+		addr += PGSIZE;
+		page = spt_find_page(&thread_current()->spt, addr);
+	}
 	/* Project 3 */
 }

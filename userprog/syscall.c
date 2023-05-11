@@ -242,6 +242,17 @@ int read (int fd, void *buffer, unsigned size) {
 	if(check_fd(fd) == false){
 		return -1;
 	}
+
+	void * buf = buffer;
+	while(buf < buffer + size){
+		struct page * bufpage =spt_find_page(&thread_current()->spt, buf);
+		if(bufpage->writable == false){
+			exit(-1);
+		}
+		buf += PGSIZE;
+	}
+	
+
 	struct file *f = thread_current()->fdt[fd];
 
 	if(f == STDIN_FP){
@@ -272,6 +283,7 @@ int write (int fd, const void *buffer, unsigned size) {
 	if(check_fd(fd) == false){
 		return -1;
 	}
+
 	struct file *f = thread_current()->fdt[fd];
 
 	if(f == STDOUT_FP){
@@ -377,6 +389,12 @@ void * mmap(void * addr, size_t length, int writable, int fd, off_t offset){
 	if((addr == NULL) || (is_user_vaddr(addr) == false) || (addr != pg_round_down(addr))){
 		return NULL;
 	}
+	if(((size_t)addr / PGSIZE + length / PGSIZE) > (KERN_BASE / PGSIZE)){
+		return NULL;
+	}
+	if(length == 0 || (length < offset)){
+		return NULL;
+	}
 	if(check_fd(fd) == false){
 		return NULL;
 	}
@@ -384,14 +402,11 @@ void * mmap(void * addr, size_t length, int writable, int fd, off_t offset){
 	if(f == STDIN_FP || f == STDOUT_FP){
 		return NULL;
 	}
-	if(length == 0){
-		return NULL;
-	}
+
 	if(spt_find_page(&thread_current()->spt, addr) != NULL){
 		return NULL;
 	}
 	
-	// ASSERT(0);
 	return do_mmap(addr, length, writable, f, offset);
 }
 

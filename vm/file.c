@@ -60,7 +60,6 @@ do_mmap (void *addr, size_t length, int writable,
 	size_t zero_bytes = PGSIZE - read_bytes % PGSIZE;
 	void *upage = addr;
 	int64_t mmap_id = timer_ticks();
-	// printf("rd: %d %d\n",read_bytes, zero_bytes);
 	while (read_bytes > 0 || zero_bytes > 0) {
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
@@ -68,7 +67,7 @@ do_mmap (void *addr, size_t length, int writable,
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
 		/* Project 3 */
 		struct load_info * info = malloc(sizeof(struct load_info));
-		info->file = file;
+		info->file = file_reopen(file);
 		info->ofs = offset;
 		info->page_read_bytes = page_read_bytes;
 		info->page_zero_bytes = page_zero_bytes;
@@ -99,16 +98,16 @@ do_munmap (void *addr) {
 	if(mmap_id == 0){
 		return;
 	}
-	
-	while(page->mmap_id == mmap_id){
+	struct file* file = page->file.file;
+	while(((page = spt_find_page(&thread_current()->spt, addr)) != NULL) && (page->mmap_id == mmap_id)){
 		if(pml4_is_dirty(thread_current()->pml4, page->va)){
 			file_write_at(page->file.file, page->frame->kva, page->file.page_read_bytes, page->file.ofs);
 		}
 		pml4_clear_page(thread_current()->pml4, page->va);
 		hash_delete(&thread_current()->spt, &page->spt_elem);
+		file_close(page->file.file);
 		destroy(page);
 		addr += PGSIZE;
-		page = spt_find_page(&thread_current()->spt, addr);
 	}
 	/* Project 3 */
 }

@@ -279,6 +279,7 @@ process_exec (void *f_name) {
 	process_cleanup ();
 	/* And then load the binary */
 	sema_down(&sys_sema);
+	// printf("load called\n");
 	success = load (file_name, &_if);
 	sema_up(&sys_sema);
 	/* If load failed, quit. */
@@ -786,14 +787,13 @@ lazy_load_segment (struct page *page, void *aux) {
 	uint32_t read_bytes = info->page_read_bytes;
 	uint32_t zero_bytes = info->page_zero_bytes;
 	struct frame *frame = page->frame;
+	page->mmap_id = info->mmap_id;
 
 	off_t ofs = info->ofs;
 
 	file_seek (file, ofs);	/* Load this page. */
 	if (file_read (file, frame->kva, read_bytes) != (int) read_bytes) {
 		palloc_free_page (frame->kva);
-		// free(page);
-		// 여기서 할지 아면 swap_in에서 할지??
 		free(aux);
 		return false;
 	}
@@ -879,15 +879,6 @@ setup_stack (struct intr_frame *if_) {
 		thread_current()->stack_bottom = stack_bottom;
 		success = true;
 	}
-	
-
-
-	// if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1)) {    // type, upage, writable
-	// 	success = vm_claim_page(stack_bottom);
-	// 	if (success) {
-	// 		if_->rsp = USER_STACK;
-	// 	}
-	// }
 	/* Project 3 */
 	return success;
 	}

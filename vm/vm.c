@@ -70,7 +70,6 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 			goto err;
 		}
 		if(VM_TYPE(type) == VM_FILE){
-			new_page->mmap_id = ((struct load_info *)aux)->mmap_id;
 			uninit_new(new_page, upage, init, type, aux, file_backed_initializer);
 		}
 		else if(VM_TYPE(type) == VM_ANON){
@@ -115,7 +114,7 @@ spt_insert_page (struct supplemental_page_table *spt, struct page *page) {
 void
 spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 	/* Project 3 */
-	// struct hash_elem *e = hash_delete(&spt->spt_hash_table, &page->spt_elem);
+
 	vm_dealloc_page (page);
 	// if (e == NULL) {
 		// return true;
@@ -200,9 +199,8 @@ vm_get_frame (void) {
 static void
 vm_stack_growth (void *addr) {
 	int pgnum = (thread_current()->stack_bottom - (uintptr_t)pg_round_down(addr)) / PGSIZE;
-	// printf("%d\n", pgnum);
+
 	for(int i = 1 ; i <= pgnum ; i++){
-		// printf("%d\n", i);
 		vm_alloc_page(VM_ANON | VM_MARKER_0, thread_current()->stack_bottom - PGSIZE*i, true);
 		vm_claim_page(thread_current()->stack_bottom + PGSIZE*i);
 	}
@@ -217,27 +215,36 @@ vm_handle_wp (struct page *page UNUSED) {
 /* Return true on success */
 bool
 vm_try_handle_fault (struct intr_frame *f, void *addr,
-		bool user, bool write UNUSED, bool not_present UNUSED) {
+		bool user, bool write, bool not_present) {
 	struct supplemental_page_table *spt = &thread_current ()->spt;
 	/* Project 3 */
-
-	if(check_addr(addr) == false){
-		
-		if(is_user_vaddr(addr) == false){
-			return false;
-		}
-		if(user == true){
-			thread_current()->ursp = f->rsp;
-		}
-		if((USER_STACK - 0x100000 <= thread_current()->ursp - 8) && (thread_current()->ursp - 8 <= addr)){
-			vm_stack_growth(addr);
-			return true;
-		}
+	if(!not_present){
 		return false;
 	}
-
+	if(addr == NULL){
+		return false;
+	}
+	if(is_user_vaddr(addr) == false){
+			return false;
+	}
+	if(pml4_get_page(thread_current()->pml4, addr) == NULL){
+		if(spt_find_page(&thread_current()->spt, addr) == NULL){
+			if(addr >= USER_STACK){
+				return false;
+			}
+			if(user == true){
+				thread_current()->ursp = f->rsp;
+			}
+			if((USER_STACK - 0x100000 <= thread_current()->ursp - 8) && (thread_current()->ursp - 8 <= addr)){
+				vm_stack_growth(addr);
+				return true;
+			}
+			return false;
+		}
+	}
 
 	struct page *page = spt_find_page(spt, addr);
+
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
 	/* Project 3 */
@@ -276,7 +283,7 @@ vm_do_claim_page (struct page *page) {
 	/* Set links */
 	frame->page = page;
 	page->frame = frame;
-
+	
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	/* Project 3 */
 	if(pml4_get_page (thread_current()->pml4, page->va) != NULL){

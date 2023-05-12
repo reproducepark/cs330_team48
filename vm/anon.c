@@ -53,7 +53,6 @@ anon_swap_in (struct page *page, void *kva) {
 /* Swap out the page by writing contents to the swap disk. */
 static bool
 anon_swap_out (struct page *page) {
-	printf("swap out-anon\n");
 	page->anon.idx = bitmap_scan_and_flip(swap_table, 0, 1, false);
 	if(page->anon.idx == BITMAP_ERROR){
 		return false;
@@ -62,7 +61,6 @@ anon_swap_out (struct page *page) {
 		disk_write(swap_disk, page->anon.idx * 8 + i, page->va + DISK_SECTOR_SIZE * i);
 	}
 	pml4_clear_page(thread_current()->pml4, page->va);
-	// page->frame = NULL;
 	return true;
 }
 

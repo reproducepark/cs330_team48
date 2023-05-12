@@ -45,6 +45,8 @@ file_backed_swap_in (struct page *page, void *kva) {
 	file_seek (file, ofs);	/* Load this page. */
 	if (file_read (file, kva, read_bytes) != (int) read_bytes) {
 		palloc_free_page (kva);
+		// list_remove(&page->frame->ft_elem);
+		// free(page->frame);
 		return false;
 	}
 	memset (kva + read_bytes, 0, zero_bytes);

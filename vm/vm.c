@@ -7,6 +7,7 @@
 /* Project 3 */
 #include "threads/vaddr.h"
 #include "threads/mmu.h"
+#include "userprog/process.h"
 
 struct list frame_table;
 
@@ -165,7 +166,7 @@ static struct frame *
 vm_evict_frame (void) {
 	struct frame *victim = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
-	swap_out(victim->page);
+	printf("swap out : %s\n",swap_out(victim->page) ? "success" : "fail");
 	return victim;
 }
 
@@ -216,20 +217,25 @@ vm_handle_wp (struct page *page UNUSED) {
 bool
 vm_try_handle_fault (struct intr_frame *f, void *addr,
 		bool user, bool write, bool not_present) {
+	// printf("mem in try-handle-fault: %p\n", addr);
 	struct supplemental_page_table *spt = &thread_current ()->spt;
 	/* Project 3 */
 	if(!not_present){
+		printf("here1\n");
 		return false;
 	}
 	if(addr == NULL){
+		printf("here2\n");
 		return false;
 	}
 	if(is_user_vaddr(addr) == false){
-			return false;
+		printf("here3\n");
+		return false;
 	}
 	if(pml4_get_page(thread_current()->pml4, addr) == NULL){
 		if(spt_find_page(&thread_current()->spt, addr) == NULL){
 			if(addr >= USER_STACK){
+				printf("here4\n");
 				return false;
 			}
 			if(user == true){
@@ -239,6 +245,7 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
 				vm_stack_growth(addr);
 				return true;
 			}
+			printf("here5\n");
 			return false;
 		}
 	}
@@ -279,7 +286,7 @@ vm_do_claim_page (struct page *page) {
 	if (frame == NULL) {
 		return false;
 	}
-
+	// printf("page-va: %p\n", page->va);
 	/* Set links */
 	frame->page = page;
 	page->frame = frame;
@@ -292,7 +299,9 @@ vm_do_claim_page (struct page *page) {
 	if(pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable) == false){
 		return false;
 	}
-	return swap_in (page, frame->kva);
+	bool a = swap_in (page, frame->kva);
+	printf("swap in : %s\n",a ? "success" : "fail");
+	return a;
 	/* Project 3 */
 }
 
@@ -319,36 +328,48 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 				if(aux->file != NULL){
 					aux->file = file_reopen(aux->file);
 				}
-				vm_alloc_page_with_initializer(page->uninit.type, page->va, page->writable, page->uninit.init, aux);
-				vm_claim_page(page->va);
+				if(!vm_alloc_page_with_initializer(page->uninit.type, page->va, page->writable, page->uninit.init, aux)){
+					return false;
+				}
+				// ASSERT(0);
+				if(!vm_claim_page(page->va)){
+					return false;
+				}
 				break;
 				}
 			case VM_FILE:
 				{
+				// ASSERT(0);
 				struct load_info * info = malloc(sizeof(struct load_info));
-				struct file * file = file_reopen(page->file.file);
-
-				file_seek(file, info->ofs);
-				if(!vm_alloc_page(page->operations->type, page->va, page->writable))
+				info->file = file_reopen(page->file.file);
+				info->ofs = page->file.ofs;
+				info->page_read_bytes = page->file.page_read_bytes;
+				info->page_zero_bytes = page->file.page_zero_bytes;
+				info->mmap_id = page->mmap_id;
+				void *aux = info;
+				if(!vm_alloc_page_with_initializer (page->operations->type, page->va, page->writable, lazy_load_segment, aux)){
 					return false;
+				}
 				struct page * dst_page = spt_find_page(dst, page->va);
-				dst_page->file.file = file;
-				dst_page->file.ofs = info->ofs;
-				dst_page->file.page_read_bytes = info->page_read_bytes;
-				dst_page->file.page_zero_bytes = info->page_zero_bytes;
-				vm_do_claim_page(dst_page);
+				if(!vm_do_claim_page(dst_page)){
+					return false;
+				}
 				break;
 				}
 			case VM_ANON:
 				{
-				if(vm_alloc_page(page->operations->type, page->va, page->writable) == false){
+				if(!vm_alloc_page(page->operations->type, page->va, page->writable)){
+					// ASSERT(0);
 					return false;
 				}
 				struct page * dst_page = spt_find_page(dst, page->va);
-				if(vm_do_claim_page(dst_page) == false){
+				// ASSERT(0);
+				if(!vm_do_claim_page(dst_page)){
+					// ASSERT(0);
 					return false;
 				}
 				memcpy(dst_page->frame->kva, page->frame->kva, PGSIZE);
+				// ASSERT(0);
 				break;
 				}
 
@@ -371,6 +392,7 @@ supplemental_page_table_kill (struct supplemental_page_table *spt) {
 		struct page * page = hash_entry (hash_cur(&i), struct page, spt_elem);
 		if((page->operations->type == VM_FILE) && pml4_is_dirty(thread_current()->pml4, page->va)){
 			file_write_at(page->file.file, page->frame->kva, page->file.page_read_bytes, page->file.ofs);
+			file_close(page->file.file);
 		}
 		destroy(page);
 	}

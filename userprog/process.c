@@ -106,8 +106,9 @@ process_fork (const char *name, struct intr_frame *if_) {
 			break;
 		}
 	}
+	// ASSERT(0);
 	sema_down(&child->fork_wait);
-
+	// ASSERT(0);
 	if(child->fork_status == -1){
 		// sema_up(&child->parent_wait);
 		sema_up(&child->exit_wait);
@@ -190,11 +191,14 @@ __do_fork (void *aux) {
 	if (current->pml4 == NULL)
 		goto error;
 	process_activate (current);
-
+	// ASSERT(0);
 #ifdef VM
 	supplemental_page_table_init (&current->spt);
-	if (!supplemental_page_table_copy (&current->spt, &parent->spt))
+	// ASSERT(0);
+	if (!supplemental_page_table_copy (&current->spt, &parent->spt)){
 		goto error;
+	}
+		// goto error;
 #else
 	if (!pml4_for_each (parent->pml4, duplicate_pte, parent))
 		goto error;

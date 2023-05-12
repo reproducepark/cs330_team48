@@ -35,19 +35,44 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 /* Swap in the page by read contents from the file. */
 static bool
 file_backed_swap_in (struct page *page, void *kva) {
-	struct file_page *file_page UNUSED = &page->file;
+	struct file_page *file_page = &page->file;
+	struct file *file = file_page->file;
+	uint32_t read_bytes = file_page->page_read_bytes;
+	uint32_t zero_bytes = file_page->page_zero_bytes;
+
+	off_t ofs = file_page->ofs;
+
+	file_seek (file, ofs);	/* Load this page. */
+	if (file_read (file, kva, read_bytes) != (int) read_bytes) {
+		palloc_free_page (kva);
+		return false;
+	}
+	memset (kva + read_bytes, 0, zero_bytes);
+	return true;
 }
 
 /* Swap out the page by writeback contents to the file. */
 static bool
 file_backed_swap_out (struct page *page) {
-	struct file_page *file_page UNUSED = &page->file;
+	struct file_page *file_page = &page->file;
+	/* Project 3 */
+	if(pml4_is_dirty(thread_current()->pml4, page->va)){
+		file_write_at(file_page->file, page->frame->kva, file_page->page_read_bytes, file_page->ofs);
+		pml4_set_dirty (thread_current()->pml4, page->va, 0);
+	}
+	pml4_clear_page(thread_current()->pml4, page->va);
+	page->frame = NULL;
+	return true;
+	/* Project 3 */
 }
 
 /* Destory the file backed page. PAGE will be freed by the caller. */
 static void
 file_backed_destroy (struct page *page) {
+	/* Project 3 */
 	struct file_page *file_page UNUSED = &page->file;
+	
+	/* Project 3 */
 }
 
 /* Do the mmap */

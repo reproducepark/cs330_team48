@@ -6,6 +6,7 @@
 /* Projcet 3 */
 #include <bitmap.h>
 struct bitmap *swap_table;
+extern struct list frame_table;
 /* Project 3 */
 
 /* DO NOT MODIFY BELOW LINE */
@@ -46,6 +47,14 @@ anon_swap_in (struct page *page, void *kva) {
 	for(int i = 0; i < 8; i++){
 		disk_read(swap_disk, page->anon.idx * 8 + i, page->frame->kva + DISK_SECTOR_SIZE * i);
 	}
+	if(page->frame->cpy_cnt > 0){
+		for(struct list_elem * e = list_begin(&frame_table); (e != list_end(&frame_table)); e = list_next(e)){
+			struct frame *frame = list_entry(e, struct frame, ft_elem);
+			if(frame->page->anon.idx == page->anon.idx){
+				pml4_set_page(frame->page->pml4, frame->page->va, kva, false);
+			}
+		}
+	}
 	bitmap_flip(swap_table, page->anon.idx);
 	return true;
 }
@@ -60,7 +69,15 @@ anon_swap_out (struct page *page) {
 	for(int i = 0; i < 8; i++){
 		disk_write(swap_disk, page->anon.idx * 8 + i, page->va + DISK_SECTOR_SIZE * i);
 	}
-	pml4_clear_page(thread_current()->pml4, page->va);
+	void * kva = page->frame->kva;
+	for(struct list_elem * e = list_begin(&frame_table); (e != list_end(&frame_table)); e = list_next(e)){
+		struct frame *frame = list_entry(e, struct frame, ft_elem);
+		if(frame->kva == kva){
+			pml4_clear_page(frame->page->pml4, frame->page->va);
+			frame->page->anon.idx = page->anon.idx;
+		}
+	}
+	// pml4_clear_page(thread_current()->pml4, page->va);
 	return true;
 }
 

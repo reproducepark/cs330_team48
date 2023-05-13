@@ -4,6 +4,8 @@
 /* Project 3 */
 #include "threads/vaddr.h"
 #include "userprog/process.h"
+
+extern struct list frame_table;
 /* Project 3 */
 
 static bool file_backed_swap_in (struct page *page, void *kva);
@@ -50,6 +52,15 @@ file_backed_swap_in (struct page *page, void *kva) {
 		return false;
 	}
 	memset (kva + read_bytes, 0, zero_bytes);
+	
+	if(page->frame->cpy_cnt > 0){
+		for(struct list_elem * e = list_begin(&frame_table); (e != list_end(&frame_table)); e = list_next(e)){
+			struct frame *frame = list_entry(e, struct frame, ft_elem);
+			if(file_get_inode(frame->page->file.file) == file_get_inode(page->file.file)){
+				pml4_set_page(frame->page->pml4, frame->page->va, kva, false);
+			}
+		}
+	}
 	return true;
 }
 
@@ -58,9 +69,21 @@ static bool
 file_backed_swap_out (struct page *page) {
 	struct file_page *file_page = &page->file;
 	/* Project 3 */
-	if(pml4_is_dirty(thread_current()->pml4, page->va)){
-		file_write_at(file_page->file, page->frame->kva, file_page->page_read_bytes, file_page->ofs);
-		pml4_set_dirty (thread_current()->pml4, page->va, 0);
+	if(page->frame->cpy_cnt > 0){
+		// we don't need to write back
+		void * kva = page->frame->kva;
+		for(struct list_elem * e = list_begin(&frame_table); (e != list_end(&frame_table)); e = list_next(e)){
+			struct frame *frame = list_entry(e, struct frame, ft_elem);
+			if(frame->kva == kva){
+				pml4_clear_page(frame->page->pml4, frame->page->va);
+			}
+		}
+	}
+	else{
+		if(pml4_is_dirty(thread_current()->pml4, page->va)){
+			file_write_at(file_page->file, page->frame->kva, file_page->page_read_bytes, file_page->ofs);
+			pml4_set_dirty (thread_current()->pml4, page->va, 0);
+		}
 	}
 	pml4_clear_page(thread_current()->pml4, page->va);
 	page->frame = NULL;

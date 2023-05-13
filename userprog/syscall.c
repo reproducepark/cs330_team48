@@ -189,7 +189,11 @@ bool create (const char *file, unsigned initial_size){
 	if(check_addr(file) == false){
 		exit(-1);
 	}
-	return filesys_create(file, initial_size);
+	sema_down(&sys_sema);
+	bool success = filesys_create(file, initial_size);
+	sema_up(&sys_sema);
+
+	return success;
 }
 
 bool remove (const char *file) {

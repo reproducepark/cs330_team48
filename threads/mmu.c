@@ -313,3 +313,11 @@ pml4_set_accessed (uint64_t *pml4, const void *vpage, bool accessed) {
 			invlpg ((uint64_t) vpage);
 	}
 }
+
+/* Project 3 */
+void
+pml4_set_write_protect (uint64_t *pml4, void *upage) {
+	uint64_t *pte = pml4e_walk (pml4, (uint64_t) upage, 0);
+	*pte = *pte & 0xfffffffffffffffd;
+}
+/* Project 3 */

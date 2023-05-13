@@ -294,8 +294,7 @@ vm_do_claim_page (struct page *page) {
 	if(pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable) == false){
 		return false;
 	}
-	bool a = swap_in (page, frame->kva);
-	return a;
+	return swap_in (page, frame->kva);
 	/* Project 3 */
 }
 
@@ -303,6 +302,7 @@ vm_do_claim_page (struct page *page) {
 void
 supplemental_page_table_init (struct supplemental_page_table *spt) {
 	hash_init(&spt->spt_hash_table, spt_hash_func, spt_hash_less_func, NULL);
+	spt->pml4 = thread_current()->pml4;
 }
 
 /* Copy supplemental page table from src to dst */
@@ -332,32 +332,47 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 				}
 			case VM_FILE:
 				{
-				struct load_info * info = malloc(sizeof(struct load_info));
-				info->file = file_reopen(page->file.file);
-				info->ofs = page->file.ofs;
-				info->page_read_bytes = page->file.page_read_bytes;
-				info->page_zero_bytes = page->file.page_zero_bytes;
-				info->mmap_id = page->mmap_id;
-				void *aux = info;
-				if(!vm_alloc_page_with_initializer (page->operations->type, page->va, page->writable, lazy_load_segment, aux)){
+				// struct load_info * info = malloc(sizeof(struct load_info));
+				// info->file = file_reopen(page->file.file);
+				// info->ofs = page->file.ofs;
+				// info->page_read_bytes = page->file.page_read_bytes;
+				// info->page_zero_bytes = page->file.page_zero_bytes;
+				// info->mmap_id = page->mmap_id;
+				// void *aux = info;
+				if(!vm_alloc_page (page->operations->type, page->va, false)){
 					return false;
 				}
 				struct page * dst_page = spt_find_page(dst, page->va);
-				if(!vm_do_claim_page(dst_page)){
+				dst_page->mmap_id = page->mmap_id;
+				if(!vm_cow_frame_connect(dst_page, page, src->pml4)){
 					return false;
 				}
+				dst_page->file.file = file_reopen(page->file.file);
+				dst_page->file.ofs = page->file.ofs;
+				dst_page->file.page_read_bytes = page->file.page_read_bytes;
+				dst_page->file.page_zero_bytes = page->file.page_zero_bytes;
+				
+
+				// if(!vm_do_claim_page(dst_page)){
+				// 	return false;
+				// }
 				break;
 				}
 			case VM_ANON:
 				{
-				if(!vm_alloc_page(page->operations->type, page->va, page->writable)){
+				if(!vm_alloc_page(page->operations->type, page->va, false)){
 					return false;
 				}
 				struct page * dst_page = spt_find_page(dst, page->va);
-				if(!vm_do_claim_page(dst_page)){
+
+				if(!vm_cow_frame_connect(dst_page, page, src->pml4)){
 					return false;
 				}
-				memcpy(dst_page->frame->kva, page->frame->kva, PGSIZE);
+
+				// if(!vm_do_claim_page(dst_page)){
+				// 	return false;
+				// }
+				// memcpy(dst_page->frame->kva, page->frame->kva, PGSIZE);
 				break;
 				}
 
@@ -399,6 +414,27 @@ bool spt_hash_less_func (const struct hash_elem *a, const struct hash_elem *b, v
 	struct page *page_a = hash_entry (a, struct page, spt_elem);
 	struct page *page_b = hash_entry (b, struct page, spt_elem);
 	return page_a->va < page_b->va;
+}
+
+bool vm_cow_frame_connect (struct page * dst_page, struct page * src_page, uint64_t * src_pml4) {
+	struct frame * frame = (struct frame *)calloc(sizeof (struct frame), 1);
+	frame->page = dst_page;
+	dst_page->frame = frame;
+	frame->kva = src_page->frame->kva;
+	list_push_back(&frame_table, &frame->ft_elem);
+
+	if(pml4_get_page(thread_current()->pml4, dst_page->va) != NULL){
+		return false;
+	}
+	if(pml4_set_page(thread_current()->pml4, dst_page->va, dst_page->frame->kva, false) == false){
+		return false;
+	}
+
+	pml4_set_write_protect(src_pml4, dst_page->va);
+	src_page->writable = false;
+	frame->cow_cnt = ++src_page->frame->cow_cnt;
+
+	return swap_in (dst_page, frame->kva);
 }
 
 /* Project 3 */

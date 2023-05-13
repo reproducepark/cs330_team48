@@ -32,7 +32,4 @@ struct desc_ptr {
 	uint64_t address;
 } __attribute__((packed));
 
-/* Project 3 */
-void pml4_set_write_protect (uint64_t *pml4, void *upage);
-/* Project 3 */
 #endif /* thread/mm.h */

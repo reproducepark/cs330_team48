@@ -131,7 +131,7 @@ do_munmap (void *addr) {
 			file_write_at(page->file.file, page->frame->kva, page->file.page_read_bytes, page->file.ofs);
 		}
 		pml4_clear_page(thread_current()->pml4, page->va);
-		hash_delete(&thread_current()->spt, &page->spt_elem);
+		hash_delete(&thread_current()->spt.spt_hash_table, &page->spt_elem);
 		file_close(page->file.file);
 		destroy(page);
 		addr += PGSIZE;

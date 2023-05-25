@@ -195,9 +195,12 @@ __do_fork (void *aux) {
 #ifdef VM
 	supplemental_page_table_init (&current->spt);
 	// ASSERT(0);
+	sema_down(&sys_sema);
 	if (!supplemental_page_table_copy (&current->spt, &parent->spt)){
+		sema_up(&sys_sema);
 		goto error;
 	}
+	sema_up(&sys_sema);
 		// goto error;
 #else
 	if (!pml4_for_each (parent->pml4, duplicate_pte, parent))

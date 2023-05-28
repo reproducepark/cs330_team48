@@ -19,4 +19,10 @@ struct ptr{
 #define FDT_SIZE 512
 /* Project 2 */
 
+/* Project 3 */
+#ifdef VM
+bool lazy_load_segment (struct page *page, void *aux);
+#endif
+/* Project 3 */
+
 #endif /* userprog/process.h */

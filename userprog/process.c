@@ -107,11 +107,8 @@ process_fork (const char *name, struct intr_frame *if_) {
 		}
 	}
 	sema_down(&child->fork_wait);
-
 	if(child->fork_status == -1){
-		// sema_up(&child->parent_wait);
 		sema_up(&child->exit_wait);
-		// sema_up(&child->child_wait);
 		return TID_ERROR;
 	}
 
@@ -189,12 +186,15 @@ __do_fork (void *aux) {
 	current->pml4 = pml4_create();
 	if (current->pml4 == NULL)
 		goto error;
-
 	process_activate (current);
 #ifdef VM
 	supplemental_page_table_init (&current->spt);
-	if (!supplemental_page_table_copy (&current->spt, &parent->spt))
+	sema_down(&sys_sema);
+	if (!supplemental_page_table_copy (&current->spt, &parent->spt)){
+		sema_up(&sys_sema);
 		goto error;
+	}
+	sema_up(&sys_sema);
 #else
 	if (!pml4_for_each (parent->pml4, duplicate_pte, parent))
 		goto error;
@@ -276,16 +276,11 @@ process_exec (void *f_name) {
 	_if.eflags = FLAG_IF | FLAG_MBS;
 
 	/* We first kill the current context */
-	// ASSERT(0);
 	process_cleanup ();
-	// ASSERT(0);
 	/* And then load the binary */
 	sema_down(&sys_sema);
-	// ASSERT(0);
 	success = load (file_name, &_if);
-	// ASSERT(0);
 	sema_up(&sys_sema);
-	// ASSERT(0);
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success){
@@ -365,7 +360,8 @@ process_cleanup (void) {
 	struct thread *curr = thread_current ();
 
 #ifdef VM
-	supplemental_page_table_kill (&curr->spt);
+	if(!hash_empty(&curr->spt.spt_hash_table))
+		supplemental_page_table_kill (&curr->spt);
 #endif
 
 	uint64_t *pml4;
@@ -477,9 +473,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	int argc = 0;
 	int fn_len = strlen (file_name);
 
-	// fn_cpy = (char *)malloc (fn_len+1);
 	fn_cpy = palloc_get_page(PAL_ZERO);
-	// ASSERT(0);
 	strlcpy (fn_cpy, file_name, PGSIZE);
 
 	file_name = strtok_r (fn_cpy, " ", &save_ptr);
@@ -498,7 +492,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	if (t->pml4 == NULL)
 		goto done;
 	process_activate (t);
-	// ASSERT(0);
 	/* Open executable file. */
 	file = filesys_open (file_name);
 	if (file == NULL) {
@@ -576,15 +569,12 @@ load (const char *file_name, struct intr_frame *if_) {
 		}
 	}
 
-	// ASSERT (0);
 	
 	/* Set up stack. */
 	if (!setup_stack (if_))
 		goto done;
-	// ASSERT(0);
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
-
 	/* Project 2 */
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
@@ -593,18 +583,17 @@ load (const char *file_name, struct intr_frame *if_) {
 	for(int i = argc - 1; i >= 0; i--){
 		int len = strlen(argv[i]);
 		if_->rsp -= (len+1);
-		// 문제지점
-
-		strlcpy((char *)&if_->rsp, argv[i], len + 1);
-
+		strlcpy((char *)if_->rsp, argv[i], len + 1);
+		
 		argv[i] = if_->rsp;
 	}
-	// ASSERT(0);
+
 	// for padding
 	while(if_->rsp % 8 != 0){
 		if_->rsp --;
 		memset(if_->rsp, 0, sizeof(uint8_t));
 	}
+
 	// for argv
 	if_->rsp -= sizeof(char *);
 	memset(if_->rsp, 0, sizeof(char*));
@@ -624,12 +613,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Project 2 */
 
 	success = true;
-	// ASSERT (0);
+
 done:
 	/* We arrive here whether the load is successful or not. */
 	/* Project 2 */
 	palloc_free_page(fn_cpy);
-	// ASSERT(0);
+
 	t->elf = file;
 	/* Project 2 */
 	return success;
@@ -784,7 +773,7 @@ install_page (void *upage, void *kpage, bool writable) {
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
-static bool
+bool
 lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
@@ -795,20 +784,27 @@ lazy_load_segment (struct page *page, void *aux) {
 	uint32_t read_bytes = info->page_read_bytes;
 	uint32_t zero_bytes = info->page_zero_bytes;
 	struct frame *frame = page->frame;
+	page->mmap_id = info->mmap_id;
 
 	off_t ofs = info->ofs;
 
 	file_seek (file, ofs);	/* Load this page. */
 	if (file_read (file, frame->kva, read_bytes) != (int) read_bytes) {
 		palloc_free_page (frame->kva);
-		// free(page);
-		// 여기서 할지 아면 swap_in에서 할지??
 		free(aux);
 		return false;
 	}
 	memset (frame->kva + read_bytes, 0, zero_bytes);
+	if (page_get_type(page) == VM_FILE){
+		page->file.file = file;
+		page->file.ofs = ofs;
+		page->file.page_read_bytes = read_bytes;
+		page->file.page_zero_bytes = zero_bytes;
+	}
+
 
 	free(aux);
+	return true;
 	/* Project 3 */
 }
 
@@ -852,18 +848,15 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		/* Project 3 */
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
 					writable, lazy_load_segment, aux)){
+			free(aux);
 			return false;
 		}
-		// ASSERT (0);
 		/* Advance. */
-		// /* Project 3 */
-		// ofs += page_read_bytes;
-		// /* Project 3 */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
-
-		ofs += page_read_bytes;	}
+		ofs += page_read_bytes;
+	}
 	return true;
 }
 
@@ -880,17 +873,9 @@ setup_stack (struct intr_frame *if_) {
 	/* Project 3 */
 	if(vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, true) && (vm_claim_page(stack_bottom))){
 		if_->rsp = USER_STACK;
-		return true;
+		thread_current()->stack_bottom = stack_bottom;
+		success = true;
 	}
-	
-
-
-	// if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1)) {    // type, upage, writable
-	// 	success = vm_claim_page(stack_bottom);
-	// 	if (success) {
-	// 		if_->rsp = USER_STACK;
-	// 	}
-	// }
 	/* Project 3 */
 	return success;
 	}

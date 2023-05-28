@@ -52,6 +52,8 @@ struct page {
 	/* Project 3 */
 	struct hash_elem spt_elem;
 	bool writable;
+	int64_t mmap_id;
+	uint64_t *pml4;			/* For COW */
 	/* Project 3 */
 
 	/* Per-type data are binded into the union.
@@ -72,6 +74,7 @@ struct frame {
 	struct page *page;
 	/* Project 3 */
 	struct list_elem ft_elem;
+	int cpy_cnt;
 	/* Project 3 */
 };
 
@@ -107,6 +110,7 @@ struct load_info {
 	off_t ofs;
 	uint32_t page_read_bytes;
 	uint32_t page_zero_bytes;
+	int64_t mmap_id;
 };
 /* Project 3 */
 
@@ -135,6 +139,11 @@ enum vm_type page_get_type (struct page *page);
 /* Project 3 */
 uint64_t spt_hash_func (const struct hash_elem *e, void *aux UNUSED);
 bool spt_hash_less_func (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED);
+bool vm_cow_frame_connect (struct page * dst_page, struct page * src_page);
+bool vm_copy_on_write(struct page * page);
+void vm_dec_cpy_cnt(void * kva, int cnt);
+void vm_set_cpy_cnt(void * kva, int cpy_cnt);
+void vm_inc_cpy_cnt(void * kva, int cnt);
 /* Project 3 */
 
 #endif  /* VM_VM_H */

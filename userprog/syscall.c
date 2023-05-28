@@ -17,6 +17,10 @@
 struct semaphore sys_sema;
 /* Project 2 */
 
+/* Project 3 */
+#include "vm/vm.h"
+/* Project 3 */
+
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 
@@ -39,6 +43,11 @@ void close (int fd);
 bool check_fd(int fd);
 bool check_addr(void *addr);
 /* Project 2 */
+
+/* Project 3 */
+void * mmap(void * addr, size_t length, int writable, int fd, off_t offset);
+void munmap(void * addr);
+/* Project 3 */
 
 /* System call.
  *
@@ -72,9 +81,10 @@ syscall_init (void) {
 
 /* The main system call interface */
 void
-syscall_handler (struct intr_frame *f UNUSED) {
+syscall_handler (struct intr_frame *f) {
 	// TODO: Your implementation goes here.
 	/* Project 2 */
+	thread_current()->ursp = f->rsp;
 	switch(f->R.rax){
 		case SYS_HALT:
 			halt();
@@ -121,6 +131,14 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_DUP2:
 			f->R.rax = dup2(f->R.rdi, f->R.rsi);
 			break;
+		/* Project 3 */
+		case SYS_MMAP:
+			f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+			break;
+		case SYS_MUNMAP:
+			munmap(f->R.rdi);
+			break;
+		/* Project 3 */
 		default:
 			exit(-1);
 			break;
@@ -143,7 +161,8 @@ pid_t fork (const char *thread_name, struct intr_frame *if_ ) {
 	if(check_addr(thread_name) == false){
 		exit(-1);
 	}
-	return process_fork(thread_name, if_);
+	tid_t tid = process_fork(thread_name, if_);
+	return tid;
 }
 
 int exec (const char *cmd_line) {
@@ -171,7 +190,11 @@ bool create (const char *file, unsigned initial_size){
 	if(check_addr(file) == false){
 		exit(-1);
 	}
-	return filesys_create(file, initial_size);
+	sema_down(&sys_sema);
+	bool success = filesys_create(file, initial_size);
+	sema_up(&sys_sema);
+
+	return success;
 }
 
 bool remove (const char *file) {
@@ -224,6 +247,17 @@ int read (int fd, void *buffer, unsigned size) {
 	if(check_fd(fd) == false){
 		return -1;
 	}
+
+	void * buf = buffer;
+	while(buf < buffer + size){
+		struct page * bufpage =spt_find_page(&thread_current()->spt, buf);
+		if(bufpage->writable == false){
+			exit(-1);
+		}
+		buf += PGSIZE;
+	}
+	
+
 	struct file *f = thread_current()->fdt[fd];
 
 	if(f == STDIN_FP){
@@ -254,6 +288,7 @@ int write (int fd, const void *buffer, unsigned size) {
 	if(check_fd(fd) == false){
 		return -1;
 	}
+
 	struct file *f = thread_current()->fdt[fd];
 
 	if(f == STDOUT_FP){
@@ -322,6 +357,11 @@ bool check_addr (void* addr){
 		return false;
 	}
 	else if(pml4_get_page(thread_current()->pml4, addr) == NULL){
+		#ifdef VM
+			if(spt_find_page(&thread_current()->spt, addr) != NULL){
+				return true;
+			}
+		#endif
 		return false;
 	}
 	return true;
@@ -348,3 +388,40 @@ int dup2(int oldfd, int newfd){
 }
 
 /* Project 2 */
+
+/* Project 3 */
+void * mmap(void * addr, size_t length, int writable, int fd, off_t offset){
+	if((addr == NULL) || (is_user_vaddr(addr) == false) || (addr != pg_round_down(addr))){
+		return NULL;
+	}
+	if(((size_t)addr / PGSIZE + length / PGSIZE) > (KERN_BASE / PGSIZE)){
+		return NULL;
+	}
+	if(length == 0 || (length < offset)){
+		return NULL;
+	}
+	if(check_fd(fd) == false){
+		return NULL;
+	}
+	struct file *f = thread_current()->fdt[fd];
+	if(f == STDIN_FP || f == STDOUT_FP){
+		return NULL;
+	}
+
+	if(spt_find_page(&thread_current()->spt, addr) != NULL){
+		return NULL;
+	}
+	
+	return do_mmap(addr, length, writable, f, offset);
+}
+
+void munmap(void * addr){
+	if((addr == NULL) || (is_user_vaddr(addr) == false) || (addr != pg_round_down(addr))){
+		return NULL;
+	}
+	struct page * page = spt_find_page(&thread_current()->spt, addr);
+	if(page_get_type(page) == VM_FILE){
+		do_munmap(addr);
+	}
+}
+/* Project 3 */

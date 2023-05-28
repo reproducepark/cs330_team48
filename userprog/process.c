@@ -106,13 +106,9 @@ process_fork (const char *name, struct intr_frame *if_) {
 			break;
 		}
 	}
-	// ASSERT(0);
 	sema_down(&child->fork_wait);
-	// ASSERT(0);
 	if(child->fork_status == -1){
-		// sema_up(&child->parent_wait);
 		sema_up(&child->exit_wait);
-		// sema_up(&child->child_wait);
 		return TID_ERROR;
 	}
 
@@ -191,17 +187,14 @@ __do_fork (void *aux) {
 	if (current->pml4 == NULL)
 		goto error;
 	process_activate (current);
-	// ASSERT(0);
 #ifdef VM
 	supplemental_page_table_init (&current->spt);
-	// ASSERT(0);
 	sema_down(&sys_sema);
 	if (!supplemental_page_table_copy (&current->spt, &parent->spt)){
 		sema_up(&sys_sema);
 		goto error;
 	}
 	sema_up(&sys_sema);
-		// goto error;
 #else
 	if (!pml4_for_each (parent->pml4, duplicate_pte, parent))
 		goto error;
@@ -286,7 +279,6 @@ process_exec (void *f_name) {
 	process_cleanup ();
 	/* And then load the binary */
 	sema_down(&sys_sema);
-	// printf("load called\n");
 	success = load (file_name, &_if);
 	sema_up(&sys_sema);
 	/* If load failed, quit. */
@@ -591,8 +583,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	for(int i = argc - 1; i >= 0; i--){
 		int len = strlen(argv[i]);
 		if_->rsp -= (len+1);
-		// 문제지점
-
 		strlcpy((char *)if_->rsp, argv[i], len + 1);
 		
 		argv[i] = if_->rsp;

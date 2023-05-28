@@ -118,10 +118,6 @@ spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 	/* Project 3 */
 
 	vm_dealloc_page (page);
-	// if (e == NULL) {
-		// return true;
-	// }
-	// return false;
 	/* Project 3 */
 }
 
@@ -253,9 +249,6 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
 		return vm_copy_on_write(page);
 	}
 	
-
-	/* TODO: Validate the fault */
-	/* TODO: Your code goes here */
 	/* Project 3 */
 	return vm_do_claim_page (page);
 }
@@ -337,13 +330,6 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 				}
 			case VM_FILE:
 				{
-				// struct load_info * info = malloc(sizeof(struct load_info));
-				// info->file = file_reopen(page->file.file);
-				// info->ofs = page->file.ofs;
-				// info->page_read_bytes = page->file.page_read_bytes;
-				// info->page_zero_bytes = page->file.page_zero_bytes;
-				// info->mmap_id = page->mmap_id;
-				// void *aux = info;
 				if(!vm_alloc_page (page->operations->type, page->va, page->writable)){
 					return false;
 				}
@@ -357,10 +343,6 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 				dst_page->file.page_read_bytes = page->file.page_read_bytes;
 				dst_page->file.page_zero_bytes = page->file.page_zero_bytes;
 				
-
-				// if(!vm_do_claim_page(dst_page)){
-				// 	return false;
-				// }
 				break;
 				}
 			case VM_ANON:
@@ -374,10 +356,6 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 					return false;
 				}
 
-				// if(!vm_do_claim_page(dst_page)){
-				// 	return false;
-				// }
-				// memcpy(dst_page->frame->kva, page->frame->kva, PGSIZE);
 				break;
 				}
 
@@ -440,17 +418,7 @@ bool vm_cow_frame_connect (struct page * dst_page, struct page * src_page) {
 	}
 
 	pml4_set_page(src_page->pml4, src_page->va, src_page->frame->kva, false);
-	// int cnt = frame->cpy_cnt + 1;
-	// void * kva = frame->kva;
-	// for(struct list_elem * e = list_begin(&frame_table); (e != list_end(&frame_table)) && cnt != 0; e = list_next(e)){
-	// 	struct frame *frame = list_entry(e, struct frame, ft_elem);
-	// 	if(frame ->kva == kva){
-	// 		frame->cpy_cnt++;
-	// 		cnt--;
-	// 	}
-	// }
 	vm_set_cpy_cnt(frame->kva, src_page->frame->cpy_cnt + 1);
-	//모든 child
 	return swap_in (dst_page, frame->kva);
 }
 
@@ -470,7 +438,6 @@ bool vm_copy_on_write(struct page * page) {
 		return false;
 	}
 	vm_set_cpy_cnt(origin_kva, frame->cpy_cnt-1);
-	// vm_dec_cpy_cnt(origin_kva, frame->cpy_cnt);
 	frame->cpy_cnt = 0;
 	memcpy(frame->kva, origin_kva, PGSIZE);
 

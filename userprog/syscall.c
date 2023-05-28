@@ -161,9 +161,7 @@ pid_t fork (const char *thread_name, struct intr_frame *if_ ) {
 	if(check_addr(thread_name) == false){
 		exit(-1);
 	}
-	// sema_down(&sys_sema);
 	tid_t tid = process_fork(thread_name, if_);
-	// sema_up(&sys_sema);
 	return tid;
 }
 
